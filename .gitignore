@@ -1,0 +1,57 @@
+.DS_Store
+.venv/
+/.codex/
+/.agents/
+/.git/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.pyo
+*.sqlite3
+*.sqlite3-*
+*.sqlite
+*.db
+.coverage
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Keep only the reviewed synthetic private fixtures. Any newly dropped file in
+# this tree is presumed sensitive until it is explicitly allowlisted here.
+/fixtures/private/**
+!/fixtures/private/subject-alpha/
+!/fixtures/private/subject-alpha/abpm-report.txt
+!/fixtures/private/subject-alpha/lab-report.txt
+!/fixtures/private/subject-beta/
+!/fixtures/private/subject-beta/lab-report.txt
+
+# Never commit medical source documents, extracted PHI, credentials, state, or exports.
+/state/
+/archive*/
+/private-archives/
+/local-archives/
+/private/
+/exports/
+/tmp/
+/incoming/
+/uploads/
+/raw/
+/logs/
+*.log
+/case-packets/
+/receipts/
+
+# Keep local configuration and credentials private while retaining the template.
+.env*
+!.env.example
+*.secret
+*.secrets
+*credential*
+*token*
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa
