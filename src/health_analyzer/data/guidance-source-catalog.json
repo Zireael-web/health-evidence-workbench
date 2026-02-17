@@ -1,0 +1,675 @@
+{
+  "schema_version": "1.0",
+  "sources": [
+    {
+      "source_id": "aad",
+      "issuer": "American Academy of Dermatology",
+      "authority_tier": "specialty-society",
+      "index_url": "https://www.aad.org/member/clinical-quality/guidelines",
+      "canonical_hosts": [
+        "www.aad.org",
+        "www.jaad.org"
+      ],
+      "domains": [
+        "dermatology"
+      ],
+      "jurisdictions": [
+        "GLOBAL",
+        "US"
+      ],
+      "document_kinds": [
+        "clinical-guideline"
+      ],
+      "status_signals": [
+        "development-status",
+        "publication-date",
+        "update-notice"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 60,
+      "priority": 30
+    },
+    {
+      "source_id": "acc-aha",
+      "issuer": "American College of Cardiology and American Heart Association",
+      "authority_tier": "specialty-society",
+      "index_url": "https://www.acc.org/guidelines",
+      "canonical_hosts": [
+        "www.acc.org",
+        "www.jacc.org"
+      ],
+      "domains": [
+        "cardiology",
+        "sport"
+      ],
+      "jurisdictions": [
+        "GLOBAL",
+        "US"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "consensus-statement",
+        "scientific-statement"
+      ],
+      "status_signals": [
+        "document-type",
+        "publication-date",
+        "update-notice",
+        "year"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 45,
+      "priority": 25
+    },
+    {
+      "source_id": "clsi",
+      "issuer": "Clinical and Laboratory Standards Institute",
+      "authority_tier": "standards-body",
+      "index_url": "https://clsi.org/shop/",
+      "canonical_hosts": [
+        "clsi.org"
+      ],
+      "domains": [
+        "laboratory-medicine"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "consensus-standard",
+        "laboratory-guideline"
+      ],
+      "status_signals": [
+        "correction-notice",
+        "edition",
+        "publication-status",
+        "reaffirmed-status"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "paywalled",
+      "browser_fallback": true,
+      "review_interval_days": 90,
+      "priority": 20
+    },
+    {
+      "source_id": "eadv",
+      "issuer": "European Academy of Dermatology and Venereology",
+      "authority_tier": "specialty-society",
+      "index_url": "https://eadv.org/publications/jeadv/clinical-guidelines-recommendations-position-statements/",
+      "canonical_hosts": [
+        "eadv.org",
+        "onlinelibrary.wiley.com"
+      ],
+      "domains": [
+        "dermatology"
+      ],
+      "jurisdictions": [
+        "EU",
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "consensus-statement",
+        "position-statement"
+      ],
+      "status_signals": [
+        "document-type",
+        "publication-date",
+        "update-notice"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 60,
+      "priority": 25
+    },
+    {
+      "source_id": "ecdc",
+      "issuer": "European Centre for Disease Prevention and Control",
+      "authority_tier": "governmental",
+      "index_url": "https://www.ecdc.europa.eu/en/publications-data",
+      "canonical_hosts": [
+        "www.ecdc.europa.eu"
+      ],
+      "domains": [
+        "infectious-disease",
+        "public-health"
+      ],
+      "jurisdictions": [
+        "EU"
+      ],
+      "document_kinds": [
+        "public-health-guidance",
+        "technical-guidance"
+      ],
+      "status_signals": [
+        "publication-date",
+        "publication-type",
+        "update-notice"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "open_html",
+      "browser_fallback": false,
+      "review_interval_days": 30,
+      "priority": 20
+    },
+    {
+      "source_id": "ema",
+      "issuer": "European Medicines Agency",
+      "authority_tier": "regulator",
+      "index_url": "https://www.ema.europa.eu/en/human-regulatory-overview/research-development/scientific-guidelines",
+      "canonical_hosts": [
+        "www.ema.europa.eu"
+      ],
+      "domains": [
+        "medicines"
+      ],
+      "jurisdictions": [
+        "EU"
+      ],
+      "document_kinds": [
+        "regulatory-guideline",
+        "scientific-guideline"
+      ],
+      "status_signals": [
+        "consultation-status",
+        "effective-date",
+        "first-published",
+        "last-updated",
+        "reference-number",
+        "version-status"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": false,
+      "review_interval_days": 30,
+      "priority": 15
+    },
+    {
+      "source_id": "endocrine-society",
+      "issuer": "Endocrine Society",
+      "authority_tier": "specialty-society",
+      "index_url": "https://www.endocrine.org/clinical-practice-guidelines",
+      "canonical_hosts": [
+        "academic.oup.com",
+        "www.endocrine.org"
+      ],
+      "domains": [
+        "endocrinology"
+      ],
+      "jurisdictions": [
+        "GLOBAL",
+        "US"
+      ],
+      "document_kinds": [
+        "clinical-guideline"
+      ],
+      "status_signals": [
+        "publication-date",
+        "retired-status",
+        "update-notice"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 60,
+      "priority": 25
+    },
+    {
+      "source_id": "esc",
+      "issuer": "European Society of Cardiology",
+      "authority_tier": "specialty-society",
+      "index_url": "https://www.escardio.org/guidelines",
+      "canonical_hosts": [
+        "academic.oup.com",
+        "www.escardio.org"
+      ],
+      "domains": [
+        "cardiology",
+        "sport"
+      ],
+      "jurisdictions": [
+        "EU",
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "consensus-statement",
+        "focused-update"
+      ],
+      "status_signals": [
+        "document-type",
+        "publication-date",
+        "publication-schedule",
+        "update-notice",
+        "year"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 45,
+      "priority": 20
+    },
+    {
+      "source_id": "eular",
+      "issuer": "European Alliance of Associations for Rheumatology",
+      "authority_tier": "specialty-society",
+      "index_url": "https://www.eular.org/recommendations-management",
+      "canonical_hosts": [
+        "ard.bmj.com",
+        "www.eular.org"
+      ],
+      "domains": [
+        "rheumatology"
+      ],
+      "jurisdictions": [
+        "EU",
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "recommendation",
+        "systematic-review"
+      ],
+      "status_signals": [
+        "doi",
+        "publication-date",
+        "update-year"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 60,
+      "priority": 20
+    },
+    {
+      "source_id": "fda",
+      "issuer": "United States Food and Drug Administration",
+      "authority_tier": "regulator",
+      "index_url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents",
+      "canonical_hosts": [
+        "www.fda.gov"
+      ],
+      "domains": [
+        "cosmetics",
+        "medicines"
+      ],
+      "jurisdictions": [
+        "US"
+      ],
+      "document_kinds": [
+        "regulatory-guidance"
+      ],
+      "status_signals": [
+        "comment-status",
+        "draft-final-status",
+        "issue-date",
+        "withdrawn-status"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "open_html",
+      "browser_fallback": true,
+      "review_interval_days": 30,
+      "priority": 20
+    },
+    {
+      "source_id": "gina",
+      "issuer": "Global Initiative for Asthma",
+      "authority_tier": "specialty-society",
+      "index_url": "https://ginasthma.org/reports/",
+      "canonical_hosts": [
+        "ginasthma.org"
+      ],
+      "domains": [
+        "respiratory"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "strategy-report",
+        "summary-guide"
+      ],
+      "status_signals": [
+        "archive",
+        "publication-date",
+        "update-year"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "open_pdf",
+      "browser_fallback": true,
+      "review_interval_days": 45,
+      "priority": 20
+    },
+    {
+      "source_id": "idsa",
+      "issuer": "Infectious Diseases Society of America",
+      "authority_tier": "specialty-society",
+      "index_url": "https://www.idsociety.org/practice-guideline/all-practice-guidelines/",
+      "canonical_hosts": [
+        "academic.oup.com",
+        "www.idsociety.org"
+      ],
+      "domains": [
+        "infectious-disease"
+      ],
+      "jurisdictions": [
+        "GLOBAL",
+        "US"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "practice-guideline"
+      ],
+      "status_signals": [
+        "archived-status",
+        "publication-date",
+        "update-notice"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 45,
+      "priority": 25
+    },
+    {
+      "source_id": "ifcc",
+      "issuer": "International Federation of Clinical Chemistry and Laboratory Medicine",
+      "authority_tier": "standards-body",
+      "index_url": "https://ifcc.org/executive-board-and-council/eb-task-forces/task-force-on-laboratory-medicine-practice-guidelines-lmpg/",
+      "canonical_hosts": [
+        "ifcc.org"
+      ],
+      "domains": [
+        "laboratory-medicine"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "best-practice-recommendation",
+        "laboratory-guideline",
+        "position-statement"
+      ],
+      "status_signals": [
+        "database-last-updated",
+        "publication-date",
+        "publisher-link"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": true,
+      "review_interval_days": 60,
+      "priority": 15
+    },
+    {
+      "source_id": "iso-medical-laboratories",
+      "issuer": "International Organization for Standardization",
+      "authority_tier": "standards-body",
+      "index_url": "https://www.iso.org/standard/76677.html",
+      "canonical_hosts": [
+        "www.iso.org"
+      ],
+      "domains": [
+        "laboratory-medicine"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "international-standard"
+      ],
+      "status_signals": [
+        "edition",
+        "life-cycle",
+        "publication-date",
+        "stage",
+        "withdrawn-version"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "paywalled",
+      "browser_fallback": true,
+      "review_interval_days": 90,
+      "priority": 20
+    },
+    {
+      "source_id": "kdigo",
+      "issuer": "Kidney Disease: Improving Global Outcomes",
+      "authority_tier": "specialty-society",
+      "index_url": "https://kdigo.org/guidelines/",
+      "canonical_hosts": [
+        "kdigo.org",
+        "www.kidney-international.org"
+      ],
+      "domains": [
+        "nephrology"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "focused-update"
+      ],
+      "status_signals": [
+        "current-standard",
+        "focused-update",
+        "publication-date",
+        "update-notice"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "open_pdf",
+      "browser_fallback": false,
+      "review_interval_days": 45,
+      "priority": 20
+    },
+    {
+      "source_id": "nice",
+      "issuer": "National Institute for Health and Care Excellence",
+      "authority_tier": "national-guideline-body",
+      "index_url": "https://www.nice.org.uk/guidance/published?ngt=NICE%20guidelines",
+      "canonical_hosts": [
+        "www.nice.org.uk"
+      ],
+      "domains": [
+        "all"
+      ],
+      "jurisdictions": [
+        "GB-ENG"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "public-health-guideline",
+        "technology-appraisal"
+      ],
+      "status_signals": [
+        "last-updated",
+        "publication-date",
+        "replacement-status",
+        "withdrawn-status"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "open_html",
+      "browser_fallback": true,
+      "review_interval_days": 30,
+      "priority": 15
+    },
+    {
+      "source_id": "sccs",
+      "issuer": "European Commission Scientific Committee on Consumer Safety",
+      "authority_tier": "scientific-committee",
+      "index_url": "https://health.ec.europa.eu/scientific-committees/scientific-committee-consumer-safety-sccs/sccs-opinions_en",
+      "canonical_hosts": [
+        "health.ec.europa.eu"
+      ],
+      "domains": [
+        "cosmetics"
+      ],
+      "jurisdictions": [
+        "EU"
+      ],
+      "document_kinds": [
+        "safety-opinion",
+        "scientific-guidance"
+      ],
+      "status_signals": [
+        "adoption-date",
+        "corrigendum",
+        "draft-final-status",
+        "opinion-id"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": false,
+      "review_interval_days": 30,
+      "priority": 10
+    },
+    {
+      "source_id": "uspstf",
+      "issuer": "United States Preventive Services Task Force",
+      "authority_tier": "national-guideline-body",
+      "index_url": "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation-topics",
+      "canonical_hosts": [
+        "www.uspreventiveservicestaskforce.org"
+      ],
+      "domains": [
+        "prevention",
+        "public-health"
+      ],
+      "jurisdictions": [
+        "US"
+      ],
+      "document_kinds": [
+        "preventive-recommendation"
+      ],
+      "status_signals": [
+        "draft-final-status",
+        "grade",
+        "publication-date",
+        "update-in-progress"
+      ],
+      "languages": [
+        "en"
+      ],
+      "access_mode": "open_html",
+      "browser_fallback": true,
+      "review_interval_days": 30,
+      "priority": 15
+    },
+    {
+      "source_id": "wada",
+      "issuer": "World Anti-Doping Agency",
+      "authority_tier": "sports-regulator",
+      "index_url": "https://www.wada-ama.org/en/resources/world-anti-doping-program/prohibited-list",
+      "canonical_hosts": [
+        "www.wada-ama.org"
+      ],
+      "domains": [
+        "anti-doping",
+        "sport"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "international-standard",
+        "prohibited-list"
+      ],
+      "status_signals": [
+        "effective-date",
+        "in-force-status",
+        "publication-date",
+        "update-year"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "open_pdf",
+      "browser_fallback": false,
+      "review_interval_days": 30,
+      "priority": 10
+    },
+    {
+      "source_id": "who",
+      "issuer": "World Health Organization",
+      "authority_tier": "intergovernmental",
+      "index_url": "https://www.who.int/publications/who-guidelines",
+      "canonical_hosts": [
+        "iris.who.int",
+        "www.who.int"
+      ],
+      "domains": [
+        "all",
+        "general-health",
+        "physical-activity",
+        "public-health"
+      ],
+      "jurisdictions": [
+        "GLOBAL"
+      ],
+      "document_kinds": [
+        "clinical-guideline",
+        "living-guideline",
+        "public-health-guideline"
+      ],
+      "status_signals": [
+        "edition",
+        "publication-date",
+        "reference-number",
+        "update-notice"
+      ],
+      "languages": [
+        "en",
+        "multi"
+      ],
+      "access_mode": "mixed",
+      "browser_fallback": false,
+      "review_interval_days": 30,
+      "priority": 10
+    }
+  ]
+}
