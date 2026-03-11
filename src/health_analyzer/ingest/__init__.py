@@ -1,0 +1,95 @@
+"""Universal immutable document-ingestion pipeline."""
+
+from .candidates import GenericCandidateBuilder
+from .extractors import (
+    CSVExtractor,
+    ImagePassthroughExtractor,
+    OCRProvider,
+    OCRProviderExtractor,
+    PDFProvider,
+    PDFProviderExtractor,
+    PlainTextExtractor,
+    decode_text,
+    default_extractors,
+)
+from .models import (
+    BlockDraft,
+    BlockKind,
+    Candidate,
+    CandidateKind,
+    CandidateProvenance,
+    DocumentArtifact,
+    ExtractionBlock,
+    ExtractionCapability,
+    ExtractionFailure,
+    IngestionError,
+    IngestionResult,
+    InstructionFinding,
+    ReviewEvent,
+    SourceChangedDuringReadError,
+    canonical_json,
+    content_hash,
+    deterministic_id,
+)
+from .pipeline import IngestionPipeline
+from .pypdf_provider import (
+    PDFPageLike,
+    PDFReaderFactory,
+    PDFReaderLike,
+    PypdfExtractionLimits,
+    PypdfTextProvider,
+)
+from .pypdf_subprocess import PypdfSubprocessLimits
+from .registry import (
+    Extractor,
+    ExtractorDescriptor,
+    ExtractorFailure,
+    ExtractorRegistry,
+)
+from .review import InvalidReviewTransition, review_candidate
+from .security import InstructionDetector, InstructionPattern
+
+__all__ = [
+    "BlockDraft",
+    "BlockKind",
+    "CSVExtractor",
+    "Candidate",
+    "CandidateKind",
+    "CandidateProvenance",
+    "DocumentArtifact",
+    "ExtractionBlock",
+    "ExtractionCapability",
+    "ExtractionFailure",
+    "Extractor",
+    "ExtractorDescriptor",
+    "ExtractorFailure",
+    "ExtractorRegistry",
+    "GenericCandidateBuilder",
+    "ImagePassthroughExtractor",
+    "IngestionError",
+    "IngestionPipeline",
+    "IngestionResult",
+    "InstructionDetector",
+    "InstructionFinding",
+    "InstructionPattern",
+    "InvalidReviewTransition",
+    "OCRProvider",
+    "OCRProviderExtractor",
+    "PDFProvider",
+    "PDFProviderExtractor",
+    "PDFPageLike",
+    "PDFReaderFactory",
+    "PDFReaderLike",
+    "PlainTextExtractor",
+    "PypdfExtractionLimits",
+    "PypdfSubprocessLimits",
+    "PypdfTextProvider",
+    "ReviewEvent",
+    "SourceChangedDuringReadError",
+    "canonical_json",
+    "content_hash",
+    "decode_text",
+    "default_extractors",
+    "deterministic_id",
+    "review_candidate",
+]
