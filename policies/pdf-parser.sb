@@ -1,0 +1,40 @@
+(version 1)
+
+; Template rendered locally by the PDF subprocess. Input travels over stdin;
+; the parser cannot read archives, state, credentials, write files, or use a
+; network connection.
+(deny default)
+(allow file-read-metadata)
+(allow file-read-data (literal "/"))
+(allow file-read*
+  (subpath "__PROJECT_ROOT__/src")
+  (subpath "__PROJECT_ROOT__/policies")
+  (subpath "__PROJECT_ROOT__/.venv")
+  (subpath "__PYTHON_ENV_ROOT__")
+  (subpath "__PYTHON_EXECUTABLE_ROOT__")
+  (subpath "/System")
+  (subpath "/usr")
+  (subpath "/Library")
+  (subpath "/private/etc")
+  (subpath "/private/var/db")
+  (literal "/dev/null")
+  (literal "/dev/random")
+  (literal "/dev/urandom"))
+(deny file-read*
+  (subpath "__PROJECT_ROOT__/private-archives")
+  (subpath "__PROJECT_ROOT__/state")
+  (literal "__PROJECT_ROOT__/.env"))
+(allow process-exec
+  (subpath "__PYTHON_ENV_ROOT__/bin")
+  (subpath "__PYTHON_EXECUTABLE_ROOT__/bin"))
+(deny process-fork)
+(allow signal)
+(allow sysctl-read)
+(allow mach-lookup)
+(deny mach-lookup
+  (global-name "com.apple.securityd.general")
+  (global-name "com.apple.securityd.xpc")
+  (global-name "com.apple.security.XPCKeychainSandboxCheck"))
+(allow ipc-posix*)
+(allow file-write* (literal "/dev/null"))
+(deny network*)

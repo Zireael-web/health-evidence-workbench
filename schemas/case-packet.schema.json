@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.health-analyzer/schemas/case-packet.schema.json",
+  "title": "CasePacket",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["packet_id", "subject_id", "created_at", "source_hashes", "observations", "statements", "limitations", "schema_version"],
+  "properties": {
+    "packet_id": {"type": "string", "pattern": "^case_[a-f0-9]{20,64}$"},
+    "subject_id": {"type": "string", "pattern": "^subj_[a-f0-9]{16,64}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "source_hashes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+    "observations": {"type": "array", "items": {"$ref": "#/$defs/observation"}},
+    "statements": {"type": "array", "items": {"$ref": "#/$defs/statement"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "schema_version": {"const": "1.0"}
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "sha256"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "locator": {"type": ["string", "null"], "minLength": 1},
+        "page": {"type": ["integer", "null"], "minimum": 1},
+        "bbox": {"type": ["array", "null"], "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}, {"type": "number"}], "minItems": 4, "maxItems": 4},
+        "line_start": {"type": ["integer", "null"], "minimum": 1},
+        "line_end": {"type": ["integer", "null"], "minimum": 1},
+        "char_start": {"type": ["integer", "null"], "minimum": 0},
+        "char_end": {"type": ["integer", "null"], "minimum": 0},
+        "excerpt": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "referenceInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "low": {"type": ["string", "null"]},
+        "high": {"type": ["string", "null"]},
+        "unit": {"type": ["string", "null"]},
+        "comparator": {"type": ["string", "null"]},
+        "label": {"enum": ["laboratory_reference", "decision_threshold", "target", "critical_threshold"]},
+        "population": {"type": ["string", "null"]}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observation_id", "subject_id", "display", "raw_value", "provenance", "verification"],
+      "properties": {
+        "observation_id": {"type": "string"},
+        "subject_id": {"type": "string", "pattern": "^subj_[a-f0-9]{16,64}$"},
+        "display": {"type": "string"},
+        "raw_value": {"type": "string"},
+        "original_unit": {"type": ["string", "null"]},
+        "code_system": {"type": ["string", "null"]},
+        "code": {"type": ["string", "null"]},
+        "normalized_value": {"type": ["string", "null"]},
+        "ucum_unit": {"type": ["string", "null"]},
+        "comparator": {"type": ["string", "null"]},
+        "specimen": {"type": ["string", "null"]},
+        "method": {"type": ["string", "null"]},
+        "device": {"type": ["string", "null"]},
+        "observed_at": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "string", "format": "date"},
+            {"type": "string", "format": "date-time"}
+          ]
+        },
+        "reference_intervals": {"type": "array", "items": {"$ref": "#/$defs/referenceInterval"}},
+        "provenance": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/provenance"}},
+        "verification": {"const": "verified"},
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement_id", "kind", "text", "support_ids", "provenance", "verification"],
+      "properties": {
+        "statement_id": {"type": "string"},
+        "kind": {"enum": ["source_fact", "user_note", "calculated", "external_evidence", "inference", "guideline_recommendation"]},
+        "text": {"type": "string"},
+        "subject_id": {"type": ["string", "null"], "pattern": "^subj_[a-f0-9]{16,64}$"},
+        "support_ids": {"type": "array", "items": {"type": "string"}},
+        "provenance": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/provenance"}},
+        "verification": {"const": "verified"},
+        "certainty": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

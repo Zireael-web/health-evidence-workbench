@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.health-analyzer/schemas/egress-case-packet.schema.json",
+  "title": "EgressCasePacket",
+  "description": "A previewed, minimized outbound case payload. It reduces disclosure but does not guarantee anonymity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "egress_packet_id",
+    "patient_ref",
+    "question",
+    "observations",
+    "statements",
+    "limitations",
+    "deidentification_notice"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "egress_packet_id": {"type": "string", "pattern": "^egress_[a-z]{24}$"},
+    "patient_ref": {"type": "string", "pattern": "^person_[a-z]{24}$"},
+    "question": {"type": ["string", "null"], "minLength": 1},
+    "observations": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/observation"}
+    },
+    "statements": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/statement"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "deidentification_notice": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "referenceInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["low", "high", "unit", "comparator", "label", "population"],
+      "properties": {
+        "low": {"type": ["string", "null"]},
+        "high": {"type": ["string", "null"]},
+        "unit": {"type": ["string", "null"]},
+        "comparator": {"type": ["string", "null"]},
+        "label": {"enum": ["laboratory_reference", "decision_threshold", "target", "critical_threshold"]},
+        "population": {"type": ["string", "null"]}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_ref",
+        "display",
+        "raw_value",
+        "original_unit",
+        "normalized_value",
+        "ucum_unit",
+        "comparator",
+        "specimen",
+        "method",
+        "device",
+        "reference_intervals",
+        "notes",
+        "source_status"
+      ],
+      "properties": {
+        "record_ref": {"type": "string", "pattern": "^obs_[a-z]{24}$"},
+        "display": {"type": "string", "minLength": 1},
+        "raw_value": {"type": "string", "minLength": 1},
+        "original_unit": {"type": ["string", "null"]},
+        "code_system": {"enum": ["ATC", "ICD-10", "ICD-10-CM", "ICD-11", "LOINC", "RxNorm", "SNOMED CT", "UCUM"]},
+        "code": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+/\\-]{0,127}$"},
+        "normalized_value": {"type": ["string", "null"]},
+        "ucum_unit": {"type": ["string", "null"]},
+        "comparator": {"type": ["string", "null"]},
+        "specimen": {"type": ["string", "null"]},
+        "method": {"type": ["string", "null"]},
+        "device": {"type": ["string", "null"]},
+        "days_before_latest_observation": {"type": "integer", "maximum": 0},
+        "reference_intervals": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/referenceInterval"}
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+        "source_status": {"const": "transcription_confirmed"}
+      },
+      "dependentRequired": {
+        "code": ["code_system"],
+        "code_system": ["code"]
+      }
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_ref", "kind", "text", "support_refs", "certainty", "source_status"],
+      "properties": {
+        "record_ref": {"type": "string", "pattern": "^stmt_[a-z]{24}$"},
+        "kind": {"enum": ["source_fact", "user_note", "calculated", "external_evidence", "inference", "guideline_recommendation"]},
+        "text": {"type": "string", "minLength": 1},
+        "support_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^(?:obs|stmt)_[a-z]{24}$"}
+        },
+        "certainty": {"type": ["string", "null"]},
+        "source_status": {"const": "transcription_confirmed"}
+      }
+    }
+  }
+}

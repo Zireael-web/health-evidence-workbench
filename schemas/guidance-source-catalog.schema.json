@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.health-analyzer/schemas/guidance-source-catalog.schema.json",
+  "title": "Guidance Source Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "sources": {
+      "type": "array",
+      "description": "Entries must be lexicographically sorted by source_id; runtime validation enforces ordering.",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    }
+  },
+  "$defs": {
+    "taxonomyKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,63}$"
+    },
+    "sortedKeys": {
+      "type": "array",
+      "description": "Values must be lexicographically sorted; runtime validation enforces ordering.",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/taxonomyKey"
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "issuer",
+        "authority_tier",
+        "index_url",
+        "canonical_hosts",
+        "domains",
+        "jurisdictions",
+        "document_kinds",
+        "status_signals",
+        "languages",
+        "access_mode",
+        "browser_fallback",
+        "review_interval_days",
+        "priority"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/taxonomyKey"
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "authority_tier": {
+          "$ref": "#/$defs/taxonomyKey"
+        },
+        "index_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "canonical_hosts": {
+          "type": "array",
+          "description": "Hosts must be lexicographically sorted; runtime validation additionally requires canonical DNS host syntax.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+$"
+          }
+        },
+        "domains": {
+          "$ref": "#/$defs/sortedKeys"
+        },
+        "jurisdictions": {
+          "type": "array",
+          "description": "Values must be lexicographically sorted; runtime validation enforces ordering.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]{0,15}$"
+          }
+        },
+        "document_kinds": {
+          "$ref": "#/$defs/sortedKeys"
+        },
+        "status_signals": {
+          "$ref": "#/$defs/sortedKeys"
+        },
+        "languages": {
+          "$ref": "#/$defs/sortedKeys"
+        },
+        "access_mode": {
+          "enum": [
+            "mixed",
+            "open_html",
+            "open_pdf",
+            "paywalled",
+            "registration"
+          ]
+        },
+        "browser_fallback": {
+          "type": "boolean"
+        },
+        "review_interval_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    }
+  }
+}
