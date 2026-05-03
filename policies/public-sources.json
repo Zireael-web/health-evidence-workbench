@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "metadata_endpoints": [
+    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/",
+    "https://api.crossref.org/"
+  ],
+  "authoritative_guidance_hosts": [
+    "academic.oup.com",
+    "ard.bmj.com",
+    "clsi.org",
+    "eadv.org",
+    "ginasthma.org",
+    "health.ec.europa.eu",
+    "ifcc.org",
+    "iris.who.int",
+    "kdigo.org",
+    "onlinelibrary.wiley.com",
+    "www.aad.org",
+    "www.acc.org",
+    "www.cdc.gov",
+    "www.ecdc.europa.eu",
+    "www.ema.europa.eu",
+    "www.endocrine.org",
+    "www.escardio.org",
+    "www.eular.org",
+    "www.fda.gov",
+    "www.heart.org",
+    "www.idsociety.org",
+    "www.iso.org",
+    "www.jaad.org",
+    "www.jacc.org",
+    "www.kidney-international.org",
+    "www.nice.org.uk",
+    "www.uspreventiveservicestaskforce.org",
+    "www.wada-ama.org",
+    "www.who.int"
+  ],
+  "rules": [
+    "Only deidentified queries may leave the public boundary.",
+    "Plan guidance discovery from the packaged health_analyzer/data/guidance-source-catalog.json before live inspection.",
+    "Prefer canonical publisher or registry URLs over secondary summaries.",
+    "Use Chrome only as a deidentified fallback for an official page that requires JavaScript or an existing login.",
+    "Cache only source-reviewed documents and recommendations used by an audited answer; do not mirror entire portals.",
+    "Store retrieval date, content hash, stable identifier, and native grade.",
+    "Do not infer study quality from publication type metadata alone.",
+    "Do not send raw private documents or CasePackets to public endpoints."
+  ]
+}

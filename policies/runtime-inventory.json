@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "tree_roots": [
+    "policies",
+    "schemas",
+    "scripts",
+    "src"
+  ],
+  "root_files": [
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "excludes": [
+    "policies/runtime-manifest.json"
+  ],
+  "prune_directories": [
+    "__pycache__"
+  ]
+}
