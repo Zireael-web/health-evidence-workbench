@@ -1,0 +1,67 @@
+#!/bin/zsh
+
+set -euo pipefail
+umask 077
+
+readonly script_dir="$(cd -- "$(dirname -- "$0")" && pwd -P)"
+readonly project_root="$(cd -- "${script_dir}/.." && pwd -P)"
+readonly state_root="${project_root}/state"
+readonly public_handoff_root="${state_root}/handoff/public"
+readonly python_executable="${project_root}/.venv/bin/python"
+readonly mcp_executable="${project_root}/.venv/bin/health-analyzer-mcp"
+readonly sandbox_template="${project_root}/policies/audit-mcp.sb"
+readonly profile_renderer="${project_root}/scripts/render-sandbox-profile"
+readonly runtime_verifier="${project_root}/scripts/verify-runtime-integrity"
+
+if [[ "$#" -ne 2 || "$1" != "--expected-runtime-manifest-sha256" ]]; then
+  print -u2 "Audit MCP requires its runtime-manifest pin."
+  exit 2
+fi
+readonly expected_runtime_manifest_sha256="$2"
+
+if [[ ! -x "/usr/bin/sandbox-exec" || ! -x "${python_executable}" || ! -x "${mcp_executable}" || ! -r "${sandbox_template}" || ! -r "${profile_renderer}" || ! -r "${runtime_verifier}" ]]; then
+  print -u2 "The local audit runtime is incomplete; run uv sync first."
+  exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${runtime_verifier}" \
+  --expected-manifest-sha256 "${expected_runtime_manifest_sha256}"
+
+if [[ -L "${state_root}" || -L "${state_root}/handoff" || -L "${public_handoff_root}" || ! -d "${public_handoff_root}" ]]; then
+  print -u2 "Issued public handoff state is unavailable or unsafe."
+  exit 1
+fi
+
+if /usr/bin/find "${public_handoff_root}" "${state_root}/handoff/keys" -type f -links +1 -print -quit | /usr/bin/grep -q .; then
+  print -u2 "Public audit state contains a multiply linked file."
+  exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  -m health_analyzer.handoff_keys \
+  --state-root "${state_root}" \
+  --kind evidence \
+  --check
+
+readonly rendered_sandbox_profile="$(mktemp -t health-analyzer-audit.XXXXXX)"
+trap 'rm -f "${rendered_sandbox_profile}"' EXIT
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${profile_renderer}" \
+  "${sandbox_template}" \
+  "${rendered_sandbox_profile}" \
+  --project-root "${project_root}"
+
+exec /usr/bin/env -i \
+  HOME="/private/var/empty" \
+  PATH="/usr/bin:/bin" \
+  TMPDIR="/private/var/empty" \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONSAFEPATH=1 \
+  PYTHONUTF8=1 \
+  HEALTH_ANALYZER_STATE_ROOT="${state_root}" \
+  /usr/bin/sandbox-exec \
+  -f "${rendered_sandbox_profile}" \
+  "${mcp_executable}" \
+  --zone audit \
+  --transport stdio

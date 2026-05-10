@@ -1,0 +1,97 @@
+#!/bin/zsh
+
+set -euo pipefail
+umask 077
+
+readonly script_dir="$(cd -- "$(dirname -- "$0")" && pwd -P)"
+readonly project_root="$(cd -- "${script_dir}/.." && pwd -P)"
+readonly synthesis_state_root="${project_root}/state/synthesis"
+readonly synthesis_tmp_root="${synthesis_state_root}/tmp"
+readonly synthesis_cache_root="${synthesis_state_root}/cache"
+readonly handoff_root="${project_root}/state/handoff"
+readonly python_executable="${project_root}/.venv/bin/python"
+readonly mcp_executable="${project_root}/.venv/bin/health-analyzer-mcp"
+readonly sandbox_template="${project_root}/policies/synthesis-mcp.sb"
+readonly rendered_sandbox_profile="${synthesis_tmp_root}/synthesis-mcp.sb"
+readonly profile_renderer="${project_root}/scripts/render-sandbox-profile"
+readonly runtime_verifier="${project_root}/scripts/verify-runtime-integrity"
+
+if [[ "$#" -ne 2 || "$1" != "--expected-runtime-manifest-sha256" ]]; then
+  print -u2 "Synthesis MCP requires its runtime-manifest pin."
+  exit 2
+fi
+readonly expected_runtime_manifest_sha256="$2"
+
+if [[ ! -x "/usr/bin/sandbox-exec" ]]; then
+  print -u2 "Required macOS sandbox command is unavailable; synthesis MCP was not started."
+  exit 1
+fi
+
+if [[ ! -x "${python_executable}" || ! -x "${mcp_executable}" || ! -r "${sandbox_template}" || ! -r "${profile_renderer}" || ! -r "${runtime_verifier}" ]]; then
+  print -u2 "The local Health Analyzer runtime is incomplete; run uv sync first."
+  exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${runtime_verifier}" \
+  --expected-manifest-sha256 "${expected_runtime_manifest_sha256}"
+
+for state_path in \
+  "${project_root}/state" \
+  "${synthesis_state_root}" \
+  "${synthesis_tmp_root}" \
+  "${synthesis_cache_root}" \
+  "${handoff_root}"
+do
+  if [[ -L "${state_path}" ]]; then
+    print -u2 "Synthesis state must not contain a symbolic-link root."
+    exit 1
+  fi
+done
+
+mkdir -p \
+  "${synthesis_state_root}" \
+  "${synthesis_tmp_root}" \
+  "${synthesis_cache_root}" \
+  "${handoff_root}"
+
+if /usr/bin/find "${synthesis_state_root}" "${handoff_root}" -type f -links +1 -print -quit | /usr/bin/grep -q .; then
+  print -u2 "Synthesis state contains a multiply linked file; synthesis MCP was not started."
+  exit 1
+fi
+chmod 700 \
+  "${project_root}/state" \
+  "${synthesis_state_root}" \
+  "${synthesis_tmp_root}" \
+  "${synthesis_cache_root}" \
+  "${handoff_root}"
+
+for handoff_kind in case evidence
+do
+  PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+    -m health_analyzer.handoff_keys \
+    --state-root "${project_root}/state" \
+    --kind "${handoff_kind}" \
+    --check
+done
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${profile_renderer}" \
+  "${sandbox_template}" \
+  "${rendered_sandbox_profile}" \
+  --project-root "${project_root}"
+
+exec /usr/bin/env -i \
+  HOME="/private/var/empty" \
+  PATH="/usr/bin:/bin" \
+  TMPDIR="${synthesis_tmp_root}" \
+  XDG_CACHE_HOME="${synthesis_cache_root}" \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONSAFEPATH=1 \
+  PYTHONUTF8=1 \
+  HEALTH_ANALYZER_STATE_ROOT="${project_root}/state" \
+  /usr/bin/sandbox-exec \
+  -f "${rendered_sandbox_profile}" \
+  "${mcp_executable}" \
+  --zone synthesis \
+  --transport stdio

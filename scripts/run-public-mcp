@@ -1,0 +1,97 @@
+#!/bin/zsh
+
+set -euo pipefail
+umask 077
+
+readonly script_dir="$(cd -- "$(dirname -- "$0")" && pwd -P)"
+readonly project_root="$(cd -- "${script_dir}/.." && pwd -P)"
+readonly public_state_root="${project_root}/state/public"
+readonly public_tmp_root="${public_state_root}/tmp"
+readonly public_cache_root="${public_state_root}/cache"
+readonly public_handoff_root="${project_root}/state/handoff/public"
+readonly python_executable="${project_root}/.venv/bin/python"
+readonly mcp_executable="${project_root}/.venv/bin/health-analyzer-mcp"
+readonly sandbox_template="${project_root}/policies/public-mcp.sb"
+readonly rendered_sandbox_profile="${public_tmp_root}/public-mcp.sb"
+readonly profile_renderer="${project_root}/scripts/render-sandbox-profile"
+readonly runtime_verifier="${project_root}/scripts/verify-runtime-integrity"
+readonly configured_ncbi_email="${NCBI_EMAIL-}"
+readonly configured_ncbi_api_key="${NCBI_API_KEY-}"
+readonly configured_crossref_email="${CROSSREF_EMAIL-}"
+
+if [[ "$#" -ne 2 || "$1" != "--expected-runtime-manifest-sha256" ]]; then
+  print -u2 "Public MCP requires its installed runtime-manifest pin."
+  exit 2
+fi
+readonly expected_runtime_manifest_sha256="$2"
+
+if [[ ! -x "/usr/bin/sandbox-exec" ]]; then
+  print -u2 "Required macOS sandbox command is unavailable; public MCP was not started."
+  exit 1
+fi
+
+if [[ ! -x "${python_executable}" || ! -x "${mcp_executable}" || ! -r "${sandbox_template}" || ! -r "${profile_renderer}" || ! -r "${runtime_verifier}" ]]; then
+  print -u2 "The local Health Analyzer runtime is incomplete; run uv sync first."
+  exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${runtime_verifier}" \
+  --expected-manifest-sha256 "${expected_runtime_manifest_sha256}"
+
+for state_path in \
+  "${project_root}/state" \
+  "${public_state_root}" \
+  "${public_tmp_root}" \
+  "${public_cache_root}" \
+  "${project_root}/state/handoff" \
+  "${public_handoff_root}"
+do
+  if [[ -L "${state_path}" ]]; then
+    print -u2 "Public state must not contain a symbolic-link root."
+    exit 1
+  fi
+done
+
+mkdir -p "${public_state_root}" "${public_tmp_root}" "${public_cache_root}" "${public_handoff_root}"
+chmod 700 \
+  "${project_root}/state" \
+  "${public_state_root}" \
+  "${public_tmp_root}" \
+  "${public_cache_root}" \
+  "${project_root}/state/handoff" \
+  "${public_handoff_root}"
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  -m health_analyzer.handoff_keys \
+  --state-root "${project_root}/state" \
+  --kind evidence
+
+if /usr/bin/find "${public_state_root}" "${public_handoff_root}" -type f -links +1 -print -quit | /usr/bin/grep -q .; then
+  print -u2 "Public state contains a multiply linked file; public MCP was not started."
+  exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${profile_renderer}" \
+  "${sandbox_template}" \
+  "${rendered_sandbox_profile}" \
+  --project-root "${project_root}"
+
+exec /usr/bin/env -i \
+  HOME="/private/var/empty" \
+  PATH="/usr/bin:/bin" \
+  TMPDIR="${public_tmp_root}" \
+  XDG_CACHE_HOME="${public_cache_root}" \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONSAFEPATH=1 \
+  PYTHONUTF8=1 \
+  HEALTH_ANALYZER_STATE_ROOT="${project_root}/state" \
+  NCBI_EMAIL="${configured_ncbi_email}" \
+  NCBI_API_KEY="${configured_ncbi_api_key}" \
+  CROSSREF_EMAIL="${configured_crossref_email}" \
+  /usr/bin/sandbox-exec \
+  -f "${rendered_sandbox_profile}" \
+  "${mcp_executable}" \
+  --zone public \
+  --transport stdio

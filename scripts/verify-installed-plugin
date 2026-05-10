@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Verify that Codex selected the exact cached bytes of the source plugin."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+
+def _parser() -> argparse.ArgumentParser:
+    project_root = Path(__file__).resolve().parents[1]
+    codex_root = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=project_root / "plugins" / "human-science-workbench",
+    )
+    parser.add_argument(
+        "--cache-root",
+        type=Path,
+        default=codex_root / "plugins" / "cache",
+    )
+    parser.add_argument("--marketplace", default="personal")
+    parser.add_argument("--plugin-list-json", type=Path)
+    return parser
+
+
+def _load_json(path: Path) -> Any:
+    with path.open("rb") as stream:
+        return json.load(stream)
+
+
+def _plugin_listing(path: Path | None) -> dict[str, Any]:
+    if path is not None:
+        payload = _load_json(path)
+    else:
+        completed = subprocess.run(
+            ["codex", "plugin", "list", "--json"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+    if not isinstance(payload, dict) or not isinstance(payload.get("installed"), list):
+        raise ValueError("Codex plugin listing is invalid")
+    return payload
+
+
+def _regular_tree(root: Path) -> dict[str, bytes]:
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError(f"plugin tree is unavailable or unsafe: {root}")
+    result: dict[str, bytes] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if path.is_symlink():
+            raise ValueError(f"plugin tree contains a symbolic link: {path}")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise ValueError(f"plugin tree contains a non-regular entry: {path}")
+        if "__pycache__" in relative.parts or path.suffix == ".pyc":
+            continue
+        result[relative.as_posix()] = path.read_bytes()
+    return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    manifest_path = args.source / ".codex-plugin" / "plugin.json"
+    manifest = _load_json(manifest_path)
+    if not isinstance(manifest, dict):
+        raise ValueError("plugin manifest is invalid")
+    name = manifest.get("name")
+    version = manifest.get("version")
+    if not isinstance(name, str) or not name or not isinstance(version, str) or not version:
+        raise ValueError("plugin manifest name/version is invalid")
+
+    plugin_id = f"{name}@{args.marketplace}"
+    matches = [
+        item
+        for item in _plugin_listing(args.plugin_list_json)["installed"]
+        if isinstance(item, dict) and item.get("pluginId") == plugin_id
+    ]
+    if len(matches) != 1 or matches[0].get("installed") is not True:
+        raise ValueError(f"plugin is not uniquely installed: {plugin_id}")
+    if matches[0].get("enabled") is not True:
+        raise ValueError(f"plugin is installed but disabled: {plugin_id}")
+    selected_version = matches[0].get("version")
+    if selected_version != version:
+        raise ValueError(
+            f"selected plugin version is stale: expected {version}, got {selected_version}"
+        )
+
+    cached = args.cache_root / args.marketplace / name / version
+    source_tree = _regular_tree(args.source)
+    cached_tree = _regular_tree(cached)
+    if source_tree.keys() != cached_tree.keys():
+        missing = sorted(source_tree.keys() - cached_tree.keys())
+        extra = sorted(cached_tree.keys() - source_tree.keys())
+        raise ValueError(
+            f"installed plugin tree differs; missing={missing}, extra={extra}"
+        )
+    changed = [
+        path for path in source_tree if source_tree[path] != cached_tree[path]
+    ]
+    if changed:
+        raise ValueError(f"installed plugin bytes differ: {changed}")
+    print(f"verified {plugin_id} {version}: {len(source_tree)} files")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
+        print(f"verify-installed-plugin: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None

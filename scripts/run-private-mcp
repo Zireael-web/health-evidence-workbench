@@ -1,0 +1,130 @@
+#!/bin/zsh
+
+set -euo pipefail
+umask 077
+
+readonly script_dir="$(cd -- "$(dirname -- "$0")" && pwd -P)"
+readonly project_root="$(cd -- "${script_dir}/.." && pwd -P)"
+readonly private_state_root="${project_root}/state/private"
+readonly private_tmp_root="${private_state_root}/tmp"
+readonly private_cache_root="${private_state_root}/cache"
+readonly private_handoff_root="${project_root}/state/handoff/private"
+readonly python_executable="${project_root}/.venv/bin/python"
+readonly mcp_executable="${project_root}/.venv/bin/health-analyzer-mcp"
+readonly cli_executable="${project_root}/.venv/bin/health-analyzer"
+readonly sandbox_template="${project_root}/policies/private-mcp.sb"
+readonly rendered_sandbox_profile="${private_tmp_root}/private-mcp.sb"
+readonly profile_renderer="${project_root}/scripts/render-sandbox-profile"
+readonly runtime_verifier="${project_root}/scripts/verify-runtime-integrity"
+readonly login_keychain="${HOME}/Library/Keychains/login.keychain-db"
+readonly private_archive_root="${HEALTH_ANALYZER_PRIVATE_ARCHIVE_ROOT-}"
+readonly configured_private_roots="${HEALTH_ANALYZER_PRIVATE_ROOTS-}"
+
+if [[ ! -x "/usr/bin/security" || ! -x "/usr/bin/sandbox-exec" ]]; then
+  print -u2 "Required macOS security commands are unavailable; private MCP was not started."
+  exit 1
+fi
+
+if [[ ! -x "${python_executable}" || ! -x "${mcp_executable}" || ! -x "${cli_executable}" || ! -r "${sandbox_template}" || ! -r "${profile_renderer}" || ! -r "${runtime_verifier}" ]]; then
+  print -u2 "The local Health Analyzer runtime is incomplete; run uv sync first."
+  exit 1
+fi
+
+readonly doctor_mode="${1-}"
+if [[ "$#" -eq 1 && "${doctor_mode}" == "--doctor" ]]; then
+  :
+elif [[ "$#" -eq 2 && "$1" == "--expected-runtime-manifest-sha256" ]]; then
+  PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+    "${runtime_verifier}" \
+    --expected-manifest-sha256 "$2"
+else
+  print -u2 "Private MCP requires its runtime-manifest pin; only --doctor is unpinned."
+  exit 2
+fi
+
+if [[ -z "${private_archive_root}" || -L "${private_archive_root}" || ! -d "${private_archive_root}" || ! -r "${private_archive_root}" || -z "${configured_private_roots}" ]]; then
+  print -u2 "Configure HEALTH_ANALYZER_PRIVATE_ARCHIVE_ROOT and HEALTH_ANALYZER_PRIVATE_ROOTS before starting private MCP."
+  exit 1
+fi
+
+if ! /usr/bin/security find-generic-password \
+  -a "health-analyzer-local" \
+  -s "health-analyzer-pseudonym-v1" \
+  "${login_keychain}" >/dev/null 2>&1; then
+  print -u2 "The Health Analyzer pseudonymization key is missing from macOS Keychain."
+  exit 1
+fi
+
+for state_path in \
+  "${project_root}/state" \
+  "${private_state_root}" \
+  "${private_tmp_root}" \
+  "${private_cache_root}" \
+  "${project_root}/state/handoff" \
+  "${private_handoff_root}"
+do
+  if [[ -L "${state_path}" ]]; then
+    print -u2 "Private state must not contain a symbolic-link root."
+    exit 1
+  fi
+done
+
+mkdir -p "${private_state_root}" "${private_tmp_root}" "${private_cache_root}" "${private_handoff_root}"
+chmod 700 \
+  "${project_root}/state" \
+  "${private_state_root}" \
+  "${private_tmp_root}" \
+  "${private_cache_root}" \
+  "${project_root}/state/handoff" \
+  "${private_handoff_root}"
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  -m health_analyzer.handoff_keys \
+  --state-root "${project_root}/state" \
+  --kind case
+
+if /usr/bin/find "${private_state_root}" "${private_handoff_root}" -type f -links +1 -print -quit | /usr/bin/grep -q .; then
+  print -u2 "Private state contains a multiply linked file; private MCP was not started."
+  exit 1
+fi
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 "${python_executable}" \
+  "${profile_renderer}" \
+  "${sandbox_template}" \
+  "${rendered_sandbox_profile}" \
+  --project-root "${project_root}" \
+  --private-archive-root "${private_archive_root}"
+
+if [[ "${doctor_mode}" == "--doctor" ]]; then
+  exec /usr/bin/env -i \
+    HOME="/private/var/empty" \
+    PATH="/usr/bin:/bin" \
+    TMPDIR="${private_tmp_root}" \
+    XDG_CACHE_HOME="${private_cache_root}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONSAFEPATH=1 \
+    PYTHONUTF8=1 \
+    HEALTH_ANALYZER_PRIVATE_ARCHIVE_ROOT="${private_archive_root}" \
+    HEALTH_ANALYZER_PRIVATE_ROOTS="${configured_private_roots}" \
+    HEALTH_ANALYZER_STATE_ROOT="${project_root}/state" \
+    "${cli_executable}" \
+    doctor \
+    --project-root "${project_root}"
+fi
+
+exec /usr/bin/env -i \
+  HOME="/private/var/empty" \
+  PATH="/usr/bin:/bin" \
+  TMPDIR="${private_tmp_root}" \
+  XDG_CACHE_HOME="${private_cache_root}" \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONSAFEPATH=1 \
+  PYTHONUTF8=1 \
+  HEALTH_ANALYZER_PRIVATE_ARCHIVE_ROOT="${private_archive_root}" \
+  HEALTH_ANALYZER_PRIVATE_ROOTS="${configured_private_roots}" \
+  HEALTH_ANALYZER_STATE_ROOT="${project_root}/state" \
+  /usr/bin/sandbox-exec \
+  -f "${rendered_sandbox_profile}" \
+  "${mcp_executable}" \
+  --zone private \
+  --transport stdio

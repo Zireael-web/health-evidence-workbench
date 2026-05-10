@@ -1,0 +1,666 @@
+#!/usr/bin/env python3
+"""Deterministically rebuild or check the pinned MCP runtime manifest."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import stat
+import sys
+import tempfile
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+INVENTORY_PATH = Path("policies/runtime-inventory.json")
+MANIFEST_PATH = Path("policies/runtime-manifest.json")
+REQUIRED_DISTRIBUTIONS = ("health-analyzer", "mcp", "pypdf")
+CANONICAL_TREE_ROOTS = ("policies", "schemas", "scripts", "src")
+CANONICAL_ROOT_FILES = ("pyproject.toml", "uv.lock")
+CANONICAL_EXCLUDES = ("policies/runtime-manifest.json",)
+CANONICAL_PRUNE_DIRECTORIES = ("__pycache__",)
+PIN_CONSUMERS = (
+    Path("plugins/human-science-workbench/.mcp.json"),
+    Path("README.md"),
+)
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+TOML_PIN_PATTERN = re.compile(
+    r'(?P<prefix>args = \["--expected-runtime-manifest-sha256", ")'
+    r"[0-9a-f]{64}"
+    r'(?P<suffix>"\])'
+)
+README_PIN_PATTERN = re.compile(
+    r"(?P<prefix>scripts/run-public-mcp "
+    r"--expected-runtime-manifest-sha256 \\\n  )"
+    r"[0-9a-f]{64}"
+)
+MAX_DECLARATION_BYTES = 1024 * 1024
+MAX_CONSUMER_BYTES = 4 * 1024 * 1024
+
+
+class UpdateError(RuntimeError):
+    """The manifest cannot be generated or applied safely."""
+
+
+@dataclass(frozen=True, slots=True)
+class FileSnapshot:
+    payload: bytes
+    mode: int
+    device: int
+    inode: int
+    size: int
+    mtime_ns: int
+    ctime_ns: int
+
+
+def _sha256(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _require_mapping(value: Any, *, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise UpdateError(f"{label} must be an object")
+    return value
+
+
+def _canonical_relative(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise UpdateError(f"{label} must contain non-empty strings")
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts or str(path) != value:
+        raise UpdateError(f"{label} contains a non-canonical project path")
+    return value
+
+
+def _string_list(value: Any, *, label: str) -> list[str]:
+    if not isinstance(value, list):
+        raise UpdateError(f"{label} must be an array")
+    result = [_canonical_relative(item, label=label) for item in value]
+    if not result or result != sorted(result) or len(result) != len(set(result)):
+        raise UpdateError(f"{label} must be a non-empty sorted unique array")
+    return result
+
+
+def _snapshot_regular(
+    path: Path,
+    *,
+    label: str,
+    maximum: int | None = None,
+) -> FileSnapshot:
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    if not no_follow:
+        raise UpdateError("this platform cannot enforce no-follow file reads")
+    flags = os.O_RDONLY | no_follow | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise UpdateError(f"{label} is unavailable") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise UpdateError(f"{label} must be a regular non-symlink file")
+        if maximum is not None and (
+            before.st_size <= 0 or before.st_size > maximum
+        ):
+            raise UpdateError(f"{label} size is invalid")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
+            payload = stream.read()
+            after = os.fstat(stream.fileno())
+    except OSError as exc:
+        raise UpdateError(f"{label} cannot be read") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+    before_identity = (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    after_identity = (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if before_identity != after_identity or len(payload) != after.st_size:
+        raise UpdateError(f"{label} changed while it was being read")
+    return FileSnapshot(
+        payload=payload,
+        mode=stat.S_IMODE(after.st_mode),
+        device=after.st_dev,
+        inode=after.st_ino,
+        size=after.st_size,
+        mtime_ns=after.st_mtime_ns,
+        ctime_ns=after.st_ctime_ns,
+    )
+
+
+def _read_regular(path: Path, *, label: str, maximum: int | None = None) -> bytes:
+    return _snapshot_regular(path, label=label, maximum=maximum).payload
+
+
+def _load_inventory_declaration(project_root: Path) -> dict[str, Any]:
+    raw = _read_regular(
+        project_root / INVENTORY_PATH,
+        label="runtime inventory declaration",
+        maximum=MAX_DECLARATION_BYTES,
+    )
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise UpdateError("runtime inventory declaration is invalid JSON") from exc
+    declaration = _require_mapping(payload, label="runtime inventory declaration")
+    if set(declaration) != {
+        "schema_version",
+        "tree_roots",
+        "root_files",
+        "excludes",
+        "prune_directories",
+    }:
+        raise UpdateError("runtime inventory declaration fields are invalid")
+    if declaration["schema_version"] != 1:
+        raise UpdateError("runtime inventory declaration schema is unsupported")
+
+    tree_roots = _string_list(declaration["tree_roots"], label="tree_roots")
+    root_files = _string_list(declaration["root_files"], label="root_files")
+    excludes = _string_list(declaration["excludes"], label="excludes")
+    prune_directories = _string_list(
+        declaration["prune_directories"], label="prune_directories"
+    )
+    if tree_roots != list(CANONICAL_TREE_ROOTS):
+        raise UpdateError("tree_roots do not match the canonical runtime inventory")
+    if root_files != list(CANONICAL_ROOT_FILES):
+        raise UpdateError("root_files do not match the canonical runtime inventory")
+    if excludes != list(CANONICAL_EXCLUDES):
+        raise UpdateError("excludes do not match the canonical runtime inventory")
+    if prune_directories != list(CANONICAL_PRUNE_DIRECTORIES):
+        raise UpdateError(
+            "prune_directories do not match the canonical runtime inventory"
+        )
+
+    roots = [PurePosixPath(value) for value in tree_roots]
+    if any(len(path.parts) != 1 for path in roots):
+        raise UpdateError("tree_roots entries must be top-level directories")
+    if any(
+        left == right or left in right.parents or right in left.parents
+        for index, left in enumerate(roots)
+        for right in roots[index + 1 :]
+    ):
+        raise UpdateError("tree_roots must not overlap")
+
+    return {
+        "tree_roots": tree_roots,
+        "root_files": root_files,
+        "excludes": excludes,
+        "prune_directories": prune_directories,
+    }
+
+
+def _runtime_inventory(project_root: Path) -> list[str]:
+    declaration = _load_inventory_declaration(project_root)
+    excluded = set(declaration["excludes"])
+    pruned = set(declaration["prune_directories"])
+    encountered_excludes: set[str] = set()
+    inventory: set[str] = set()
+
+    def add_file(candidate: Path, relative: str) -> None:
+        if relative in excluded:
+            encountered_excludes.add(relative)
+            return
+        _read_regular(candidate, label=f"runtime inventory file {relative}")
+        if relative in inventory:
+            raise UpdateError("runtime inventory paths overlap")
+        inventory.add(relative)
+
+    def raise_walk_error(error: OSError) -> None:
+        raise UpdateError("runtime inventory cannot be enumerated") from error
+
+    for root_name in declaration["tree_roots"]:
+        root = project_root / root_name
+        try:
+            root_stat = root.lstat()
+        except OSError as exc:
+            raise UpdateError("runtime inventory root is unavailable") from exc
+        if not stat.S_ISDIR(root_stat.st_mode) or stat.S_ISLNK(root_stat.st_mode):
+            raise UpdateError(
+                "runtime inventory roots must be non-symlink directories"
+            )
+
+        for current, directory_names, file_names in os.walk(
+            root,
+            topdown=True,
+            onerror=raise_walk_error,
+            followlinks=False,
+        ):
+            current_path = Path(current)
+            retained: list[str] = []
+            for name in sorted(directory_names):
+                candidate = current_path / name
+                try:
+                    candidate_stat = candidate.lstat()
+                except OSError as exc:
+                    raise UpdateError(
+                        "runtime inventory directory is unavailable"
+                    ) from exc
+                if stat.S_ISLNK(candidate_stat.st_mode) or not stat.S_ISDIR(
+                    candidate_stat.st_mode
+                ):
+                    raise UpdateError(
+                        "runtime inventory directories must not be symlinks"
+                    )
+                if name not in pruned:
+                    retained.append(name)
+            directory_names[:] = retained
+
+            for name in sorted(file_names):
+                candidate = current_path / name
+                relative = candidate.relative_to(project_root).as_posix()
+                add_file(candidate, relative)
+
+    for relative in declaration["root_files"]:
+        add_file(project_root / relative, relative)
+
+    if encountered_excludes != excluded:
+        raise UpdateError("declared runtime inventory excludes are unavailable")
+    if not inventory:
+        raise UpdateError("runtime inventory is empty")
+    return sorted(inventory)
+
+
+def _load_toml(path: Path, *, label: str) -> dict[str, Any]:
+    raw = _read_regular(path, label=label)
+    try:
+        payload = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise UpdateError(f"{label} is invalid TOML") from exc
+    return _require_mapping(payload, label=label)
+
+
+def _distribution_versions(project_root: Path) -> tuple[str, dict[str, str]]:
+    pyproject = _load_toml(project_root / "pyproject.toml", label="pyproject.toml")
+    project = _require_mapping(pyproject.get("project"), label="pyproject project")
+    if project.get("name") != "health-analyzer":
+        raise UpdateError("pyproject package name is invalid")
+    package_version = project.get("version")
+    if not isinstance(package_version, str) or not package_version:
+        raise UpdateError("pyproject package version is invalid")
+
+    lock = _load_toml(project_root / "uv.lock", label="uv.lock")
+    packages = lock.get("package")
+    if not isinstance(packages, list):
+        raise UpdateError("uv.lock package list is invalid")
+    versions: dict[str, str] = {}
+    for name in REQUIRED_DISTRIBUTIONS:
+        matches = [
+            item
+            for item in packages
+            if isinstance(item, dict) and item.get("name") == name
+        ]
+        if len(matches) != 1:
+            raise UpdateError(f"uv.lock must contain exactly one {name} package")
+        locked_version = matches[0].get("version")
+        if not isinstance(locked_version, str) or not locked_version:
+            raise UpdateError(f"uv.lock version for {name} is invalid")
+        versions[name] = locked_version
+    if versions["health-analyzer"] != package_version:
+        raise UpdateError("pyproject and uv.lock package versions disagree")
+    return package_version, versions
+
+
+def _build_manifest(project_root: Path) -> bytes:
+    paths = _runtime_inventory(project_root)
+    package_version, distributions = _distribution_versions(project_root)
+    files: list[dict[str, Any]] = []
+    for relative in paths:
+        payload = _read_regular(
+            project_root / relative,
+            label=f"runtime file {relative}",
+        )
+        files.append(
+            {
+                "path": relative,
+                "sha256": _sha256(payload),
+                "size": len(payload),
+            }
+        )
+    manifest = {
+        "schema_version": 1,
+        # The manifest is portable: actual local paths must never become a
+        # checked-in runtime artifact.
+        "project_root": "<project-root>",
+        "package_version": package_version,
+        "required_distributions": distributions,
+        "files": files,
+    }
+    return (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode(
+        "utf-8"
+    )
+
+
+def _replace_exactly_once(
+    text: str,
+    pattern: re.Pattern[str],
+    replacement: str,
+    *,
+    label: str,
+) -> str:
+    updated, count = pattern.subn(replacement, text)
+    if count != 1:
+        raise UpdateError(f"{label} must contain exactly one valid runtime pin")
+    return updated
+
+
+def _update_plugin_pin(raw: bytes, manifest_sha256: str) -> bytes:
+    try:
+        text = raw.decode("utf-8")
+        payload = json.loads(text)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise UpdateError("plugin MCP config is invalid JSON") from exc
+    config = _require_mapping(payload, label="plugin MCP config")
+    servers = _require_mapping(config.get("mcpServers"), label="plugin MCP servers")
+    server = _require_mapping(
+        servers.get("health-analyzer"), label="plugin health-analyzer server"
+    )
+    args = server.get("args")
+    if not isinstance(args, list):
+        raise UpdateError("plugin MCP runtime pin shape is invalid")
+    pin_positions = [
+        index
+        for index, value in enumerate(args[:-1])
+        if value == "--expected-runtime-manifest-sha256"
+        and isinstance(args[index + 1], str)
+        and SHA256_PATTERN.fullmatch(args[index + 1])
+    ]
+    if len(pin_positions) != 1:
+        raise UpdateError("plugin MCP runtime pin shape is invalid")
+    old = args[pin_positions[0] + 1]
+    updated, count = re.subn(
+        rf'(?P<prefix>"--expected-runtime-manifest-sha256",\s*\n\s*")'
+        rf"{re.escape(old)}"
+        rf'(?P<suffix>")',
+        rf"\g<prefix>{manifest_sha256}\g<suffix>",
+        text,
+    )
+    if count != 1:
+        raise UpdateError("plugin MCP config must contain exactly one runtime pin")
+    return updated.encode("utf-8")
+
+
+def _update_toml_pin(raw: bytes, manifest_sha256: str, *, label: str) -> bytes:
+    try:
+        text = raw.decode("utf-8")
+        payload = tomllib.loads(text)
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise UpdateError(f"{label} is invalid TOML") from exc
+    mcp_servers = _require_mapping(payload.get("mcp_servers"), label=label)
+    server = _require_mapping(mcp_servers.get("health-analyzer"), label=label)
+    args = server.get("args")
+    if (
+        not isinstance(args, list)
+        or len(args) != 2
+        or args[0] != "--expected-runtime-manifest-sha256"
+        or not isinstance(args[1], str)
+        or not SHA256_PATTERN.fullmatch(args[1])
+    ):
+        raise UpdateError(f"{label} runtime pin shape is invalid")
+    return _replace_exactly_once(
+        text,
+        TOML_PIN_PATTERN,
+        rf"\g<prefix>{manifest_sha256}\g<suffix>",
+        label=label,
+    ).encode("utf-8")
+
+
+def _update_readme_pin(raw: bytes, manifest_sha256: str) -> bytes:
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise UpdateError("README.md is not UTF-8") from exc
+    return _replace_exactly_once(
+        text,
+        README_PIN_PATTERN,
+        rf"\g<prefix>{manifest_sha256}",
+        label="README.md",
+    ).encode("utf-8")
+
+
+def _desired_files(
+    project_root: Path,
+) -> tuple[dict[Path, bytes], dict[Path, FileSnapshot]]:
+    manifest = _build_manifest(project_root)
+    manifest_sha256 = _sha256(manifest)
+    if not SHA256_PATTERN.fullmatch(manifest_sha256):
+        raise UpdateError("generated manifest hash is invalid")
+    manifest_target = project_root / MANIFEST_PATH
+    desired = {manifest_target: manifest}
+    expected_current = {
+        manifest_target: _snapshot_regular(
+            manifest_target,
+            label=MANIFEST_PATH.as_posix(),
+            maximum=MAX_CONSUMER_BYTES,
+        )
+    }
+    for relative in PIN_CONSUMERS:
+        target = project_root / relative
+        snapshot = _snapshot_regular(
+            target,
+            label=relative.as_posix(),
+            maximum=MAX_CONSUMER_BYTES,
+        )
+        raw = snapshot.payload
+        if relative.suffix == ".toml":
+            updated = _update_toml_pin(
+                raw,
+                manifest_sha256,
+                label=relative.as_posix(),
+            )
+        elif relative.suffix == ".json":
+            updated = _update_plugin_pin(raw, manifest_sha256)
+        else:
+            updated = _update_readme_pin(raw, manifest_sha256)
+        desired[target] = updated
+        expected_current[target] = snapshot
+    return desired, expected_current
+
+
+def _stage_payload(path: Path, payload: bytes, mode: int) -> Path:
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+        )
+        temporary = Path(temporary_name)
+        try:
+            os.fchmod(descriptor, stat.S_IMODE(mode))
+            with os.fdopen(descriptor, "wb") as stream:
+                descriptor = -1
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except BaseException:
+            if descriptor >= 0:
+                os.close(descriptor)
+            temporary.unlink(missing_ok=True)
+            raise
+        return temporary
+    except OSError as exc:
+        raise UpdateError(f"cannot stage atomic update for {path}") from exc
+
+
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _assert_snapshot(path: Path, expected: FileSnapshot) -> None:
+    current = _snapshot_regular(path, label=f"update target {path}")
+    if current != expected:
+        raise UpdateError(f"concurrent drift detected for {path}")
+
+
+def _assert_written(path: Path, expected_payload: bytes, expected_mode: int) -> None:
+    current = _snapshot_regular(path, label=f"updated target {path}")
+    if current.payload != expected_payload or current.mode != expected_mode:
+        raise UpdateError(f"atomic replacement verification failed for {path}")
+
+
+def _atomic_write_batch(
+    desired: dict[Path, bytes],
+    expected_current: dict[Path, FileSnapshot],
+) -> None:
+    if set(desired) != set(expected_current):
+        raise UpdateError("atomic update plan is incomplete")
+    ordered = sorted(desired)
+    staged: dict[Path, Path] = {}
+    replaced: list[Path] = []
+    for target in ordered:
+        _assert_snapshot(target, expected_current[target])
+    try:
+        for target in ordered:
+            staged[target] = _stage_payload(
+                target,
+                desired[target],
+                expected_current[target].mode,
+            )
+        for target in ordered:
+            _assert_snapshot(target, expected_current[target])
+        for target in ordered:
+            _assert_snapshot(target, expected_current[target])
+            # Record the target before the syscall. If replacement succeeds but
+            # Python receives an asynchronous exception before returning, the
+            # rollback must still restore this target.
+            replaced.append(target)
+            temporary = staged[target]
+            os.replace(temporary, target)
+            del staged[target]
+            _assert_written(
+                target,
+                desired[target],
+                expected_current[target].mode,
+            )
+        for target in ordered:
+            _assert_written(
+                target,
+                desired[target],
+                expected_current[target].mode,
+            )
+        for directory in sorted({target.parent for target in ordered}):
+            _fsync_directory(directory)
+    except BaseException as exc:
+        rollback_error: BaseException | None = None
+        for target in reversed(replaced):
+            rollback: Path | None = None
+            try:
+                original = expected_current[target]
+                rollback = _stage_payload(target, original.payload, original.mode)
+                os.replace(rollback, target)
+                rollback = None
+                _fsync_directory(target.parent)
+                _assert_written(target, original.payload, original.mode)
+            except BaseException as restore_exc:  # pragma: no cover - disk failure
+                rollback_error = restore_exc
+            finally:
+                if rollback is not None:
+                    rollback.unlink(missing_ok=True)
+        if rollback_error is not None:
+            raise UpdateError(
+                "runtime manifest update failed and rollback was incomplete"
+            ) from rollback_error
+        raise UpdateError(
+            f"runtime manifest update aborted ({exc}); prior files restored"
+        ) from exc
+    finally:
+        for temporary in staged.values():
+            temporary.unlink(missing_ok=True)
+
+
+def _stale_paths(
+    desired: dict[Path, bytes],
+    expected_current: dict[Path, FileSnapshot],
+    project_root: Path,
+) -> list[str]:
+    stale: list[str] = []
+    for target in sorted(desired):
+        if expected_current[target].payload != desired[target]:
+            stale.append(target.relative_to(project_root).as_posix())
+    return stale
+
+
+def _project_root(value: str) -> Path:
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        raise argparse.ArgumentTypeError("project root must be absolute")
+    try:
+        metadata = candidate.lstat()
+    except OSError as exc:
+        raise argparse.ArgumentTypeError("project root is unavailable") from exc
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+        raise argparse.ArgumentTypeError(
+            "project root must be a non-symlink directory"
+        )
+    if candidate.resolve() != candidate:
+        raise argparse.ArgumentTypeError("project root resolved unexpectedly")
+    return candidate
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--project-root",
+        type=_project_root,
+        default=str(DEFAULT_PROJECT_ROOT),
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="report drift without writing files",
+    )
+    args = parser.parse_args()
+    project_root: Path = args.project_root
+    try:
+        desired, expected_current = _desired_files(project_root)
+        for target, snapshot in expected_current.items():
+            _assert_snapshot(target, snapshot)
+        stale = _stale_paths(desired, expected_current, project_root)
+        if not stale:
+            print("Runtime manifest and all pin consumers are current.")
+            return 0
+        if args.check:
+            print("Runtime manifest state is stale:", file=sys.stderr)
+            for relative in stale:
+                print(f"  {relative}", file=sys.stderr)
+            return 1
+        # Write and verify the full fan-out as one batch whenever any target is
+        # stale. This prevents a concurrent edit to an already-current consumer
+        # from escaping the batch's compare-before-replace checks.
+        _atomic_write_batch(desired, expected_current)
+        print("Updated runtime manifest and pin consumers:")
+        for relative in stale:
+            print(f"  {relative}")
+        return 0
+    except UpdateError as exc:
+        print(f"Runtime manifest update failed: {exc}.", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    os.umask(0o077)
+    raise SystemExit(main())
