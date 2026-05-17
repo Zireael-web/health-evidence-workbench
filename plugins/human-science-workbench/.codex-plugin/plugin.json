@@ -1,0 +1,26 @@
+{
+  "name": "human-science-workbench",
+  "version": "0.2.0+codex.20260916101801",
+  "description": "Public scientific-metadata, source-review, and reviewed clinical-guideline workflows for Codex.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Human Science Workbench",
+    "shortDescription": "Scientific metadata and reviewed claims",
+    "longDescription": "Search PubMed and Crossref bibliographic metadata, discover current official guidance on demand, bind separately reviewed source-level findings to tamper-evident receipts, issue reviewed personal-context guideline recommendations from an audited lazy cache, recheck guidance expiry at every packet read, load canonical issued public packets for update baselines, compare guidance, monitor metadata changes, and structurally audit claim-support links. Clinical-action packet issuance is blocked pending a typed clinician-confirmation receipt. The bundled MCP tools do not retrieve article or guideline full text or automatically prove semantic entailment. This plugin does not provide a private health-data vault; private ingestion requires a separately configured local workflow.",
+    "developerName": "Local developer",
+    "category": "Research",
+    "capabilities": [
+      "PubMed and Crossref metadata retrieval",
+      "De-identified official and primary source inspection workflow",
+      "Receipt-bound source-level claim review",
+      "Canonical issued-packet baseline loading",
+      "Reviewed guideline registry comparison",
+      "Structural claim-support auditing"
+    ],
+    "defaultPrompt": "Analyze this de-identified question with current official guidance and separately reviewed scientific evidence."
+  },
+  "mcpServers": "./.mcp.json"
+}

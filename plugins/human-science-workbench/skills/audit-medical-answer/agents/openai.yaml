@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Medical Answer"
+  short_description: "Run structural checks and source-level review."
+  default_prompt: "Use $audit-medical-answer to run structural claim checks and identify which source-level and human safety review layers remain."

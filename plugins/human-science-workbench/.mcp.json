@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "health-analyzer": {
+      "command": "/usr/bin/env",
+      "args": [
+        "zsh",
+        "${HEALTH_ANALYZER_PROJECT_ROOT}/scripts/run-public-mcp",
+        "--expected-runtime-manifest-sha256",
+        "115a0ec00a0a5f4ee3ebace26e0c48a8f650c10377619dd9279b71e630f5b109"
+      ],
+      "cwd": "${HEALTH_ANALYZER_PROJECT_ROOT}",
+      "env_vars": [
+        "HEALTH_ANALYZER_PROJECT_ROOT",
+        "NCBI_EMAIL",
+        "NCBI_API_KEY",
+        "CROSSREF_EMAIL"
+      ]
+    }
+  }
+}

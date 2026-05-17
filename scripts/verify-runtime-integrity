@@ -1,0 +1,381 @@
+#!/usr/bin/env python3
+"""Fail closed when the editable MCP runtime drifts from its installed pin."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import stat
+import sys
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MANIFEST_PATH = PROJECT_ROOT / "policies" / "runtime-manifest.json"
+INVENTORY_PATH = PROJECT_ROOT / "policies" / "runtime-inventory.json"
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+MAX_MANIFEST_BYTES = 2 * 1024 * 1024
+MAX_INVENTORY_DECLARATION_BYTES = 1024 * 1024
+CANONICAL_TREE_ROOTS = ("policies", "schemas", "scripts", "src")
+CANONICAL_ROOT_FILES = ("pyproject.toml", "uv.lock")
+CANONICAL_EXCLUDES = ("policies/runtime-manifest.json",)
+CANONICAL_PRUNE_DIRECTORIES = ("__pycache__",)
+
+
+class IntegrityError(RuntimeError):
+    """The checked runtime no longer matches the installed manifest pin."""
+
+
+def _sha256(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _require_mapping(value: Any, *, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise IntegrityError(f"{label} must be an object")
+    return value
+
+
+def _read_regular_no_follow(
+    path: Path,
+    *,
+    label: str,
+    maximum: int | None = None,
+) -> tuple[bytes, os.stat_result]:
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    if not no_follow:
+        raise IntegrityError("this platform cannot enforce no-follow file reads")
+    flags = os.O_RDONLY | no_follow | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise IntegrityError(f"{label} is unavailable") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise IntegrityError(f"{label} must be a regular non-symlink file")
+        if maximum is not None and (
+            before.st_size <= 0 or before.st_size > maximum
+        ):
+            raise IntegrityError(f"{label} size is invalid")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
+            payload = stream.read()
+            after = os.fstat(stream.fileno())
+    except OSError as exc:
+        raise IntegrityError(f"{label} cannot be read") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    before_identity = (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    after_identity = (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if before_identity != after_identity or len(payload) != after.st_size:
+        raise IntegrityError(f"{label} changed while it was being read")
+    return payload, after
+
+
+def _load_manifest(expected_sha256: str) -> dict[str, Any]:
+    if not SHA256_PATTERN.fullmatch(expected_sha256):
+        raise IntegrityError("expected manifest SHA-256 is invalid")
+    raw, _ = _read_regular_no_follow(
+        MANIFEST_PATH,
+        label="runtime manifest",
+        maximum=MAX_MANIFEST_BYTES,
+    )
+    if _sha256(raw) != expected_sha256:
+        raise IntegrityError("runtime manifest does not match the installed pin")
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise IntegrityError("runtime manifest JSON is invalid") from exc
+    return _require_mapping(payload, label="runtime manifest")
+
+
+def _canonical_relative(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise IntegrityError(f"{label} must contain non-empty strings")
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts or str(path) != value:
+        raise IntegrityError(f"{label} contains a non-canonical project path")
+    return value
+
+
+def _string_list(value: Any, *, label: str) -> list[str]:
+    if not isinstance(value, list):
+        raise IntegrityError(f"{label} must be an array")
+    result = [_canonical_relative(item, label=label) for item in value]
+    if not result or result != sorted(result) or len(result) != len(set(result)):
+        raise IntegrityError(f"{label} must be a non-empty sorted unique array")
+    return result
+
+
+def _load_inventory_declaration() -> dict[str, list[str]]:
+    raw, _ = _read_regular_no_follow(
+        INVENTORY_PATH,
+        label="runtime inventory declaration",
+        maximum=MAX_INVENTORY_DECLARATION_BYTES,
+    )
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise IntegrityError("runtime inventory declaration JSON is invalid") from exc
+    declaration = _require_mapping(payload, label="runtime inventory declaration")
+    if set(declaration) != {
+        "schema_version",
+        "tree_roots",
+        "root_files",
+        "excludes",
+        "prune_directories",
+    }:
+        raise IntegrityError("runtime inventory declaration fields are invalid")
+    if declaration["schema_version"] != 1:
+        raise IntegrityError("runtime inventory declaration schema is unsupported")
+
+    tree_roots = _string_list(declaration["tree_roots"], label="tree_roots")
+    root_files = _string_list(declaration["root_files"], label="root_files")
+    excludes = _string_list(declaration["excludes"], label="excludes")
+    prune_directories = _string_list(
+        declaration["prune_directories"], label="prune_directories"
+    )
+    if tree_roots != list(CANONICAL_TREE_ROOTS):
+        raise IntegrityError(
+            "tree_roots do not match the canonical runtime inventory"
+        )
+    if root_files != list(CANONICAL_ROOT_FILES):
+        raise IntegrityError(
+            "root_files do not match the canonical runtime inventory"
+        )
+    if excludes != list(CANONICAL_EXCLUDES):
+        raise IntegrityError("excludes do not match the canonical runtime inventory")
+    if prune_directories != list(CANONICAL_PRUNE_DIRECTORIES):
+        raise IntegrityError(
+            "prune_directories do not match the canonical runtime inventory"
+        )
+
+    roots = [PurePosixPath(value) for value in tree_roots]
+    if any(len(path.parts) != 1 for path in roots):
+        raise IntegrityError("tree_roots entries must be top-level directories")
+    if any(
+        left == right or left in right.parents or right in left.parents
+        for index, left in enumerate(roots)
+        for right in roots[index + 1 :]
+    ):
+        raise IntegrityError("tree_roots must not overlap")
+
+    return {
+        "tree_roots": tree_roots,
+        "root_files": root_files,
+        "excludes": excludes,
+        "prune_directories": prune_directories,
+    }
+
+
+def _runtime_inventory() -> list[str]:
+    """Return every executable/configuration input governed by the pin."""
+
+    declaration = _load_inventory_declaration()
+    excluded = set(declaration["excludes"])
+    pruned = set(declaration["prune_directories"])
+    encountered_excludes: set[str] = set()
+    inventory: set[str] = set()
+
+    def add_file(candidate: Path, relative: str) -> None:
+        if relative in excluded:
+            encountered_excludes.add(relative)
+            return
+        descriptor = -1
+        try:
+            flags = (
+                os.O_RDONLY
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0)
+            )
+            descriptor = os.open(candidate, flags)
+            candidate_stat = os.fstat(descriptor)
+        except OSError as exc:
+            raise IntegrityError("runtime inventory entry is unavailable") from exc
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+        if not stat.S_ISREG(candidate_stat.st_mode):
+            raise IntegrityError(
+                "runtime inventory files must be regular and non-symlinked"
+            )
+        if relative in inventory:
+            raise IntegrityError("runtime inventory paths overlap")
+        inventory.add(relative)
+
+    def raise_walk_error(error: OSError) -> None:
+        raise IntegrityError("runtime inventory cannot be enumerated") from error
+
+    for root_name in declaration["tree_roots"]:
+        root = PROJECT_ROOT / root_name
+        try:
+            root_stat = root.lstat()
+        except OSError as exc:
+            raise IntegrityError("runtime inventory root is unavailable") from exc
+        if not stat.S_ISDIR(root_stat.st_mode) or stat.S_ISLNK(root_stat.st_mode):
+            raise IntegrityError(
+                "runtime inventory root must be a non-symlink directory"
+            )
+
+        for current, directory_names, file_names in os.walk(
+            root,
+            topdown=True,
+            onerror=raise_walk_error,
+            followlinks=False,
+        ):
+            current_path = Path(current)
+            retained_directories: list[str] = []
+            for name in sorted(directory_names):
+                candidate = current_path / name
+                try:
+                    candidate_stat = candidate.lstat()
+                except OSError as exc:
+                    raise IntegrityError(
+                        "runtime inventory entry is unavailable"
+                    ) from exc
+                if stat.S_ISLNK(candidate_stat.st_mode) or not stat.S_ISDIR(
+                    candidate_stat.st_mode
+                ):
+                    raise IntegrityError(
+                        "runtime inventory directories must not be symlinks"
+                    )
+                if name not in pruned:
+                    retained_directories.append(name)
+            directory_names[:] = retained_directories
+
+            for name in sorted(file_names):
+                candidate = current_path / name
+                relative = candidate.relative_to(PROJECT_ROOT).as_posix()
+                add_file(candidate, relative)
+
+    for relative in declaration["root_files"]:
+        add_file(PROJECT_ROOT / relative, relative)
+
+    if encountered_excludes != excluded:
+        raise IntegrityError("declared runtime inventory excludes are unavailable")
+    if not inventory:
+        raise IntegrityError("runtime inventory is empty")
+    return sorted(inventory)
+
+
+def _verify_runtime_inventory(manifest_paths: list[str]) -> None:
+    if manifest_paths != _runtime_inventory():
+        raise IntegrityError("runtime file inventory drifted")
+
+
+def _verify_manifest(payload: dict[str, Any]) -> None:
+    if set(payload) != {
+        "schema_version",
+        "project_root",
+        "package_version",
+        "required_distributions",
+        "files",
+    }:
+        raise IntegrityError("runtime manifest fields are invalid")
+    if payload["schema_version"] != 1:
+        raise IntegrityError("runtime manifest schema is unsupported")
+    if payload["project_root"] != "<project-root>":
+        raise IntegrityError("runtime manifest project root is invalid")
+    if PROJECT_ROOT.resolve() != PROJECT_ROOT:
+        raise IntegrityError("runtime project root resolved unexpectedly")
+
+    package_version = payload["package_version"]
+    if not isinstance(package_version, str) or not package_version:
+        raise IntegrityError("runtime package version is invalid")
+    distributions = _require_mapping(
+        payload["required_distributions"], label="required_distributions"
+    )
+    if set(distributions) != {"health-analyzer", "mcp", "pypdf"}:
+        raise IntegrityError("runtime distribution set is invalid")
+    for distribution, expected_version in sorted(distributions.items()):
+        if not isinstance(expected_version, str) or not expected_version:
+            raise IntegrityError("runtime distribution version is invalid")
+        try:
+            installed_version = version(distribution)
+        except PackageNotFoundError as exc:
+            raise IntegrityError("required runtime distribution is missing") from exc
+        if installed_version != expected_version:
+            raise IntegrityError("installed runtime distribution version drifted")
+    if distributions["health-analyzer"] != package_version:
+        raise IntegrityError("package version fields disagree")
+
+    files = payload["files"]
+    if not isinstance(files, list) or not files:
+        raise IntegrityError("runtime manifest file list is invalid")
+    paths: list[str] = []
+    for raw_entry in files:
+        entry = _require_mapping(raw_entry, label="runtime file entry")
+        if set(entry) != {"path", "sha256", "size"}:
+            raise IntegrityError("runtime file entry fields are invalid")
+        relative = entry["path"]
+        expected_hash = entry["sha256"]
+        expected_size = entry["size"]
+        if not isinstance(relative, str) or not relative:
+            raise IntegrityError("runtime file path is invalid")
+        pure_path = PurePosixPath(relative)
+        if (
+            pure_path.is_absolute()
+            or ".." in pure_path.parts
+            or str(pure_path) != relative
+        ):
+            raise IntegrityError("runtime file path escapes the project")
+        if not isinstance(expected_hash, str) or not SHA256_PATTERN.fullmatch(
+            expected_hash
+        ):
+            raise IntegrityError("runtime file SHA-256 is invalid")
+        if isinstance(expected_size, bool) or not isinstance(expected_size, int):
+            raise IntegrityError("runtime file size is invalid")
+        if expected_size < 0:
+            raise IntegrityError("runtime file size is invalid")
+        candidate = PROJECT_ROOT.joinpath(*pure_path.parts)
+        current_payload, candidate_stat = _read_regular_no_follow(
+            candidate,
+            label="pinned runtime file",
+        )
+        if candidate_stat.st_size != expected_size:
+            raise IntegrityError("pinned runtime file size drifted")
+        current_hash = _sha256(current_payload)
+        if current_hash != expected_hash:
+            raise IntegrityError("pinned runtime file content drifted")
+        paths.append(relative)
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise IntegrityError("runtime manifest paths must be sorted and unique")
+    _verify_runtime_inventory(paths)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--expected-manifest-sha256", required=True)
+    args = parser.parse_args()
+    try:
+        manifest = _load_manifest(args.expected_manifest_sha256)
+        _verify_manifest(manifest)
+    except IntegrityError as exc:
+        print(f"Runtime integrity check failed: {exc}.", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    os.umask(0o077)
+    raise SystemExit(main())
