@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ingest Health Document"
+  short_description: "Inspect and ingest private health records"
+  default_prompt: "Use $ingest-health-document to inspect local health images and PDFs, synchronize the archive, and prepare provenance-preserving records for verification."

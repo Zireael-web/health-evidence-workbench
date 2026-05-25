@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compare Clinical Guidelines"
+  short_description: "Compare current guidance by scope and risk."
+  default_prompt: "Use $compare-clinical-guidelines to discover current official guidance, choose the live-citation or audited-cache path, and compare recommendations by scope, jurisdiction, date, and native grade."
