@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect Public Source"
+  short_description: "Verify official and primary source content."
+  default_prompt: "Use $inspect-public-source with a checked de-identified prompt to inspect current official and primary sources."
