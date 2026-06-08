@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monitor Evidence Updates"
+  short_description: "Check metadata and official-source updates."
+  default_prompt: "Use $monitor-evidence-updates to load a comparison-only baseline, then check public metadata and official sources for material changes."

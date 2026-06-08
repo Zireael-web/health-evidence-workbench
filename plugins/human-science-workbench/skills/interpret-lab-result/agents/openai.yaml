@@ -1,0 +1,4 @@
+interface:
+  display_name: "Interpret Lab Result"
+  short_description: "Interpret verified laboratory observations safely."
+  default_prompt: "Use $interpret-lab-result to explain these verified observations with units, source intervals, trends, and uncertainty intact."
