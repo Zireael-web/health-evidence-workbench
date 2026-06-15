@@ -1,0 +1,4 @@
+interface:
+  display_name: "Synthesize Personal Context"
+  short_description: "Synthesize case facts and evidence offline."
+  default_prompt: "Use $synthesize-personal-context to combine verified packets offline into a traceable AnswerBundle while preserving guidance risk and the clinical-action issuance block."

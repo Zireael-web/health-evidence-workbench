@@ -1,0 +1,4 @@
+interface:
+  display_name: "Retrieve Scientific Evidence"
+  short_description: "Find and review public scientific evidence."
+  default_prompt: "Use $retrieve-scientific-evidence to plan de-identified study and guidance discovery, then route substantive claims through source inspection and exact review."

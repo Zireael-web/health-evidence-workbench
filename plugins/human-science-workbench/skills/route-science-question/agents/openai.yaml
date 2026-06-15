@@ -1,0 +1,4 @@
+interface:
+  display_name: "Route Science Question"
+  short_description: "Route questions across evidence trust zones."
+  default_prompt: "Use $route-science-question to select the safe trust zone, inputs, risk class, and output contract for this request."
