@@ -1,0 +1,348 @@
+{
+  "documents": [
+    {
+      "document_id": "syn-global-base-2022",
+      "series_id": "syn-global-series",
+      "title": "Synthetic Global Guidance: Base Edition",
+      "issuer": "Synthetic Global Board",
+      "version": "2022.1",
+      "jurisdictions": ["GLOBAL"],
+      "published_on": "2022-01-01",
+      "effective_from": "2022-02-01",
+      "last_checked_at": "2026-07-01T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-base-2022",
+        "retrieved_at": "2026-07-01T12:00:00+00:00",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "locator": "landing-page",
+        "publisher_document_id": "SYN-GB-2022"
+      }
+    },
+    {
+      "document_id": "syn-global-focus-2024",
+      "series_id": "syn-global-series",
+      "title": "Synthetic Global Guidance: Focused Update",
+      "issuer": "Synthetic Global Board",
+      "version": "2024.F1",
+      "jurisdictions": ["GLOBAL"],
+      "published_on": "2024-05-15",
+      "effective_from": "2024-06-01",
+      "last_checked_at": "2026-07-02T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-focus-2024",
+        "retrieved_at": "2026-07-02T12:00:00+00:00",
+        "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "locator": "landing-page",
+        "publisher_document_id": "SYN-GF-2024"
+      }
+    },
+    {
+      "document_id": "syn-global-amend-2025",
+      "series_id": "syn-global-series",
+      "title": "Synthetic Global Guidance: Amendment",
+      "issuer": "Synthetic Global Board",
+      "version": "2025.A1",
+      "jurisdictions": ["GLOBAL"],
+      "published_on": "2025-05-15",
+      "effective_from": "2025-06-01",
+      "last_checked_at": "2026-07-03T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-amend-2025",
+        "retrieved_at": "2026-07-03T12:00:00+00:00",
+        "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "locator": "landing-page",
+        "publisher_document_id": "SYN-GA-2025"
+      }
+    },
+    {
+      "document_id": "syn-global-full-2027",
+      "series_id": "syn-global-series",
+      "title": "Synthetic Global Guidance: Complete Replacement",
+      "issuer": "Synthetic Global Board",
+      "version": "2027.1",
+      "jurisdictions": ["GLOBAL"],
+      "published_on": "2026-12-15",
+      "effective_from": "2027-01-15",
+      "last_checked_at": "2027-01-15T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-full-2027",
+        "retrieved_at": "2027-01-15T12:00:00+00:00",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "locator": "landing-page",
+        "publisher_document_id": "SYN-GF-2027"
+      }
+    },
+    {
+      "document_id": "syn-us-2023",
+      "series_id": "syn-us-series",
+      "title": "Synthetic United States Guidance",
+      "issuer": "Synthetic US Panel",
+      "version": "2023",
+      "jurisdictions": ["US"],
+      "published_on": "2023-03-01",
+      "effective_from": "2023-04-01",
+      "last_checked_at": "2026-06-20T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/us-2023",
+        "retrieved_at": "2026-06-20T12:00:00+00:00",
+        "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "landing-page",
+        "publisher_document_id": "SYN-US-2023"
+      }
+    },
+    {
+      "document_id": "syn-eu-2023",
+      "series_id": "syn-eu-series",
+      "title": "Synthetic European Guidance",
+      "issuer": "Synthetic EU Panel",
+      "version": "2023",
+      "jurisdictions": ["EU"],
+      "published_on": "2023-02-01",
+      "effective_from": "2023-03-01",
+      "last_checked_at": "2026-06-21T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/eu-2023",
+        "retrieved_at": "2026-06-21T12:00:00+00:00",
+        "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "locator": "landing-page",
+        "publisher_document_id": "SYN-EU-2023"
+      }
+    },
+    {
+      "document_id": "syn-us-withdrawn-2021",
+      "series_id": "syn-us-withdrawn-series",
+      "title": "Synthetic Withdrawn Safety Guidance",
+      "issuer": "Synthetic US Panel",
+      "version": "2021",
+      "jurisdictions": ["US"],
+      "published_on": "2021-01-01",
+      "effective_from": "2021-02-01",
+      "withdrawn_on": "2025-01-01",
+      "declared_status": "withdrawn",
+      "status_changed_on": "2025-01-01",
+      "last_checked_at": "2024-01-01T12:00:00+00:00",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/us-withdrawn-2021",
+        "retrieved_at": "2024-01-01T12:00:00+00:00",
+        "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "locator": "archived landing-page",
+        "publisher_document_id": "SYN-US-W-2021"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "source_document_id": "syn-global-focus-2024",
+      "target_document_id": "syn-global-base-2022",
+      "relation_type": "focused_update",
+      "effective_from": "2024-06-01",
+      "affected_recommendation_keys": ["hydration-strategy"],
+      "provenance_note": "Synthetic focused update; all other base recommendations remain effective."
+    },
+    {
+      "source_document_id": "syn-global-amend-2025",
+      "target_document_id": "syn-global-base-2022",
+      "relation_type": "amends",
+      "effective_from": "2025-06-01",
+      "affected_recommendation_keys": ["recovery-strategy"],
+      "provenance_note": "Synthetic amendment of one recommendation."
+    },
+    {
+      "source_document_id": "syn-global-full-2027",
+      "target_document_id": "syn-global-base-2022",
+      "relation_type": "supersedes",
+      "effective_from": "2027-01-15",
+      "provenance_note": "Synthetic complete replacement."
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendation_id": "rec-global-base-hydration",
+      "document_id": "syn-global-base-2022",
+      "recommendation_key": "hydration-strategy",
+      "decision_key": "synthetic-hydration-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Offer  protocol Alpha — retain this spacing and punctuation verbatim.",
+      "native_grade_system": "SYN-GRADE 1.0",
+      "native_grade": "Strong — certainty ⊕⊕⊕○",
+      "native_strength": "STRONG_FOR",
+      "native_certainty": "MODERATE",
+      "direction": "for",
+      "position_key": "protocol-alpha",
+      "topic": "synthetic-hydration",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-base-2022#r1",
+        "retrieved_at": "2026-07-01T12:00:00+00:00",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "locator": "Recommendation 1",
+        "publisher_document_id": "SYN-GB-2022-R1"
+      }
+    },
+    {
+      "recommendation_id": "rec-global-base-recovery",
+      "document_id": "syn-global-base-2022",
+      "recommendation_key": "recovery-strategy",
+      "decision_key": "synthetic-recovery-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Use the base recovery protocol.",
+      "native_grade_system": "SYN-GRADE 1.0",
+      "native_grade": "Good practice statement",
+      "direction": "for",
+      "position_key": "recovery-base",
+      "topic": "synthetic-recovery",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-base-2022#r2",
+        "retrieved_at": "2026-07-01T12:00:00+00:00",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "locator": "Recommendation 2",
+        "publisher_document_id": "SYN-GB-2022-R2"
+      }
+    },
+    {
+      "recommendation_id": "rec-global-focus-hydration",
+      "document_id": "syn-global-focus-2024",
+      "recommendation_key": "hydration-strategy",
+      "decision_key": "synthetic-hydration-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Consider protocol Beta for the synthetic scenario.",
+      "native_grade_system": "SYN-GRADE 2.0",
+      "native_grade": "Conditional (⊕⊕○○)",
+      "native_strength": "CONDITIONAL_FOR",
+      "native_certainty": "LOW",
+      "direction": "conditional",
+      "position_key": "protocol-beta",
+      "topic": "synthetic-hydration",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-focus-2024#u1",
+        "retrieved_at": "2026-07-02T12:00:00+00:00",
+        "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "locator": "Updated Recommendation 1",
+        "publisher_document_id": "SYN-GF-2024-U1"
+      }
+    },
+    {
+      "recommendation_id": "rec-global-amend-recovery",
+      "document_id": "syn-global-amend-2025",
+      "recommendation_key": "recovery-strategy",
+      "decision_key": "synthetic-recovery-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Use the amended recovery protocol.",
+      "native_grade_system": "SYN-GRADE 2.1",
+      "native_grade": "Amended good practice statement",
+      "direction": "for",
+      "position_key": "recovery-amended",
+      "topic": "synthetic-recovery",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-amend-2025#a1",
+        "retrieved_at": "2026-07-03T12:00:00+00:00",
+        "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "locator": "Amended Recommendation 1",
+        "publisher_document_id": "SYN-GA-2025-A1"
+      }
+    },
+    {
+      "recommendation_id": "rec-global-full-hydration",
+      "document_id": "syn-global-full-2027",
+      "recommendation_key": "hydration-strategy",
+      "decision_key": "synthetic-hydration-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Use protocol Delta in the replacement edition.",
+      "native_grade_system": "SYN-GRADE 3.0",
+      "native_grade": "Level A / Class I",
+      "direction": "for",
+      "position_key": "protocol-delta",
+      "topic": "synthetic-hydration",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-full-2027#r1",
+        "retrieved_at": "2027-01-15T12:00:00+00:00",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "locator": "Recommendation 1",
+        "publisher_document_id": "SYN-GF-2027-R1"
+      }
+    },
+    {
+      "recommendation_id": "rec-global-full-recovery",
+      "document_id": "syn-global-full-2027",
+      "recommendation_key": "recovery-strategy",
+      "decision_key": "synthetic-recovery-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Use the replacement recovery protocol.",
+      "native_grade_system": "SYN-GRADE 3.0",
+      "native_grade": "Level B / Class IIa",
+      "direction": "conditional",
+      "position_key": "recovery-replacement",
+      "topic": "synthetic-recovery",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/global-full-2027#r2",
+        "retrieved_at": "2027-01-15T12:00:00+00:00",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "locator": "Recommendation 2",
+        "publisher_document_id": "SYN-GF-2027-R2"
+      }
+    },
+    {
+      "recommendation_id": "rec-us-hydration",
+      "document_id": "syn-us-2023",
+      "recommendation_key": "us-hydration-strategy",
+      "decision_key": "synthetic-hydration-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Do not use protocol Beta in the synthetic US context.",
+      "native_grade_system": "SYN-US-COR/LOE",
+      "native_grade": "COR 3: Harm; LOE C-LD",
+      "native_strength": "COR_3_HARM",
+      "native_certainty": "C_LD",
+      "direction": "against",
+      "position_key": "avoid-protocol-beta",
+      "topic": "synthetic-hydration",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/us-2023#r4",
+        "retrieved_at": "2026-06-20T12:00:00+00:00",
+        "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "Recommendation 4",
+        "publisher_document_id": "SYN-US-2023-R4"
+      }
+    },
+    {
+      "recommendation_id": "rec-eu-hydration",
+      "document_id": "syn-eu-2023",
+      "recommendation_key": "eu-hydration-strategy",
+      "decision_key": "synthetic-hydration-choice",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Protocol Beta may be considered in the synthetic EU context.",
+      "native_grade_system": "SYN-EU-Class/LOE",
+      "native_grade": "Class IIb, Level C",
+      "native_strength": "CLASS_IIB",
+      "native_certainty": "C",
+      "direction": "conditional",
+      "position_key": "protocol-beta",
+      "topic": "synthetic-hydration",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/eu-2023#r2",
+        "retrieved_at": "2026-06-21T12:00:00+00:00",
+        "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "locator": "Recommendation 2",
+        "publisher_document_id": "SYN-EU-2023-R2"
+      }
+    },
+    {
+      "recommendation_id": "rec-us-withdrawn-safety",
+      "document_id": "syn-us-withdrawn-2021",
+      "recommendation_key": "legacy-safety-strategy",
+      "decision_key": "synthetic-legacy-safety",
+      "population_key": "synthetic-general-adults",
+      "verbatim_text": "Use the legacy synthetic safety action.",
+      "native_grade_system": "SYN-LEGACY",
+      "native_grade": "Category B",
+      "direction": "for",
+      "position_key": "legacy-action",
+      "topic": "synthetic-safety",
+      "provenance": {
+        "canonical_url": "https://example.invalid/guidance/us-withdrawn-2021#r1",
+        "retrieved_at": "2024-01-01T12:00:00+00:00",
+        "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "locator": "Recommendation 1",
+        "publisher_document_id": "SYN-US-W-2021-R1"
+      }
+    }
+  ]
+}

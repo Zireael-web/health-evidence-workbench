@@ -1,0 +1,10 @@
+SYNTHETIC TEST FIXTURE — NOT A REAL PERSON
+Report: ambulatory blood-pressure monitoring
+Attempts: 97
+Valid total: 59
+Valid awake: 57
+Valid asleep: 2
+Duration hours: 15.03
+Declared sleep interval: 04:00-09:50
+Source conclusion: non-dipper
+Source note: monitor removed at approximately 04:30
