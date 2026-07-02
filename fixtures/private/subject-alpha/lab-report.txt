@@ -1,0 +1,8 @@
+SYNTHETIC TEST FIXTURE — NOT A REAL PERSON
+Report: basic laboratory panel
+Collected: 2026-01-15 08:30
+Specimen: serum
+
+Analyte | Result | Unit | Laboratory reference interval
+Marker A | <0,7 | mg/dL | 0,5 - 1,2
+Marker B | 15,9 | g/dL | 13,2 - 17,3
