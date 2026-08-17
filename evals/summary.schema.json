@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/health-analyzer/evals/summary.schema.json",
+  "title": "Health Analyzer red-team evaluation summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite_id",
+    "generated_at",
+    "counts",
+    "passed",
+    "strict_passed",
+    "results"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "suite_id": { "const": "health-analyzer-red-team" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail", "gap", "total"],
+      "properties": {
+        "pass": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "gap": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "passed": { "type": "boolean" },
+    "strict_passed": { "type": "boolean" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "title",
+          "category",
+          "control",
+          "expected",
+          "status",
+          "observed"
+        ],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "control": { "type": "string", "minLength": 1 },
+          "expected": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["pass", "fail", "gap"] },
+          "observed": { "type": "string", "minLength": 1 },
+          "gap_id": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "status": { "const": "gap" } },
+              "required": ["status"]
+            },
+            "then": { "required": ["gap_id"] }
+          }
+        ]
+      }
+    }
+  }
+}
