@@ -1,4 +1,10 @@
-# Human Science Workbench
+![Health Evidence Workbench — illustrated project overview](docs/assets/cover.svg)
+
+# Health Evidence Workbench
+
+[Quick start](#quick-start) · [Features](#what-it-contains) · [Privacy model](#privacy-model) · [Documentation](docs/architecture.md)
+
+**Python 3.11+ · Local-first · MCP**
 
 Local-first research and developer tooling for evidence-oriented human-science
 workflows in Codex. It separates local document handling from public metadata
