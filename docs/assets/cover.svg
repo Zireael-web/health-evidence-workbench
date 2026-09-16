@@ -1,1 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title"><title id="title">Health Evidence Workbench — illustrated project overview</title><rect x=".5" y=".5" width="1199" height="339" rx="22" fill="#11151f" stroke="#303545"/><path d="M802 33v274" stroke="#303545"/><g font-family="Arial, Helvetica, sans-serif"><text x="46" y="66" fill="#efc789" font-size="15" font-weight="700" letter-spacing="2.5">04 / RESEARCH TOOLKIT</text><text x="43" y="145" fill="#f3f4f8" font-size="43" font-weight="700" letter-spacing="-1.5">Health Evidence Workbench</text><text x="46" y="192" fill="#b0b6c6" font-size="21">Local documents. Structured evidence. Clear provenance.</text><text x="46" y="279" fill="#efc789" font-size="15" letter-spacing="1.1">PYTHON · LOCAL-FIRST · MCP</text></g><g fill="none" stroke="#efc789" stroke-opacity=".45" stroke-width="2"><path d="M906 114h90v111m0-62h108"/></g><rect x="841" y="75" width="108" height="77" rx="12" fill="#322d26" stroke="#6f5d40"/><rect x="958" y="215" width="118" height="74" rx="12" fill="#322d26" stroke="#6f5d40"/><rect x="1052" y="126" width="100" height="75" rx="12" fill="#322d26" stroke="#6f5d40"/><g stroke="#efc789" stroke-width="4" stroke-linecap="round"><path d="M862 99h55m-55 13h39m-39 13h48M979 241h54m-54 14h36M1074 151h50m-50 14h35"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="460" viewBox="0 0 960 460" role="img" aria-labelledby="title description">
+  <title id="title">Health Evidence Workbench — Порядок в исследованиях</title>
+  <desc id="description">Концептуальная иллюстрация проекта, не снимок приложения.</desc>
+  <rect width="960" height="460" rx="28" fill="#f5f2ed"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif">
+    <text x="44" y="64" fill="#52675b" font-size="30">Health Evidence Workbench</text>
+    <text x="40" y="167" fill="#34453d" font-size="62" font-weight="650" letter-spacing="-1.2">Порядок</text>
+    <text x="40" y="242" fill="#34453d" font-size="62" font-weight="650" letter-spacing="-1.2">в исследованиях</text>
+    <text x="44" y="389" fill="#52675b" font-size="30">Локальные документы · Python</text>
+  </g>
+  <g transform="translate(644 67)">
+    <circle cx="126" cy="149" r="130" fill="#eae5dd"/>
+    <rect x="38" y="44" width="171" height="226" rx="22" fill="#d4c5b1" transform="rotate(8 123 157)"/>
+    <rect x="10" y="25" width="171" height="226" rx="22" fill="#fcfaf3" transform="rotate(-5 95 138)"/>
+    <path d="M38 77h90M38 111h108M38 143h83M38 175h99" fill="none" stroke="#b8ac95" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="189" cy="234" r="43" fill="#b6c7b0"/>
+    <path d="m172 234 12 12 24-25" fill="none" stroke="#566e56" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
