@@ -45,8 +45,8 @@
     },
     {
       "path": "pyproject.toml",
-      "sha256": "015cb3351d60ebe6b7cf81f8148a2b36be498912a5eeeb0d23fc861e7fd5ae9d",
-      "size": 881
+      "sha256": "5486a19276a0b4a2b5b0c490e00c661d303acd87c833c871681b2e8103501e81",
+      "size": 862
     },
     {
       "path": "schemas/answer-bundle.schema.json",

@@ -6,7 +6,7 @@
         "zsh",
         "${HEALTH_ANALYZER_PROJECT_ROOT}/scripts/run-public-mcp",
         "--expected-runtime-manifest-sha256",
-        "115a0ec00a0a5f4ee3ebace26e0c48a8f650c10377619dd9279b71e630f5b109"
+        "d59609898bcf4e62f1bcb8606fa427a6ef7380097ec08544b18a3daf8bd1cc94"
       ],
       "cwd": "${HEALTH_ANALYZER_PROJECT_ROOT}",
       "env_vars": [

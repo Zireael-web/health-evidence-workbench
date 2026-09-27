@@ -29,5 +29,5 @@ the relevant feature instead of relying on a disclaimer elsewhere.
 
 ## Licensing
 
-The repository metadata is currently proprietary. Do not assume that a public
-repository grants permission to redistribute or relicense the code.
+The project is released under the MIT License; see [`LICENSE`](LICENSE).
+Contributions are accepted under the same license.

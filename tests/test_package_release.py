@@ -53,6 +53,7 @@ def test_sdist_contains_only_package_metadata_and_runtime_source(
     assert PurePosixPath("pyproject.toml") in relative_paths
     assert {path.parts[0] for path in relative_paths} <= {
         ".gitignore",
+        "LICENSE",
         "PKG-INFO",
         "README.md",
         "pyproject.toml",
