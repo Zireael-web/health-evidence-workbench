@@ -11,6 +11,11 @@ permissions:
 jobs:
   pytest:
     runs-on: macos-latest
+    env:
+      # The sandboxed PDF worker needs a standalone interpreter; framework builds
+      # of Python re-exec through Python.app, which the seatbelt profile denies.
+      UV_PYTHON: "3.12"
+      UV_PYTHON_PREFERENCE: only-managed
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
