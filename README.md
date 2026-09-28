@@ -1,59 +1,65 @@
-![Health Evidence Workbench — project illustration](docs/assets/cover.svg)
+![Health Evidence Workbench — иллюстрация проекта](docs/assets/cover.svg)
 
 # Health Evidence Workbench
 
-**English** | [Русский](README.ru.md)
+[Быстрый старт](#быстрый-старт) · [Возможности](#что-внутри) · [Приватность](#модель-приватности) · [Документация](#документация)
 
-[Quick start](#quick-start) · [What's inside](#whats-inside) · [Privacy](#privacy-model) · [Documentation](#documentation)
+**Python 3.11+ · Локальная обработка документов · MCP**
 
-**Python 3.11+ · Local document processing · MCP**
+Набор исследовательских и разработческих инструментов на Python для работы с
+документами и научными источниками в Codex. Локальная обработка документов
+отделена от поиска публичных метаданных. Проект сохраняет происхождение данных
+в структурированном виде, а не выдаёт автоматическое клиническое заключение.
 
-A set of Python research and developer tools for working with documents and scientific sources in Codex. Local document processing is kept separate from public metadata search. The project records data provenance in a structured form instead of producing an automatic clinical conclusion.
+Мой pet-проект для собственных исследовательских задач и изучения Python,
+типизированных данных и инструментов проверки. За основу идеи взял
+[Claude Science](https://www.anthropic.com/news/claude-science-ai-workbench)
+от Anthropic и адаптировал её под свои задачи.
 
-A personal side project for my own research tasks and for learning Python, typed data and verification tooling. The idea is based on Anthropic's
-[Claude Science](https://www.anthropic.com/news/claude-science-ai-workbench), adapted to my own needs.
+> **Не медицинская рекомендация и не медицинское изделие.** Этот MVP не ставит
+> диагнозы, не назначает лечение, не определяет срочность медицинской помощи,
+> не подтверждает клиническую валидность и не заменяет квалифицированного врача.
 
-> **Not medical advice and not a medical device.** This MVP does not diagnose,
-> prescribe treatment, assess the urgency of medical care, establish clinical
-> validity or replace a qualified doctor.
+## Что внутри
 
-## What's inside
+- Клиенты библиографических метаданных PubMed и Crossref.
+- Каталог и рабочий процесс для изучения официальных рекомендаций и первичных
+  источников.
+- Базовые средства локального импорта документов без изменения исходников
+  и синтетические тестовые данные.
+- Типизированные контракты `CasePacket` и `EvidencePacket` для передачи данных
+  между этапами.
+- Структурная проверка связей между утверждениями и подтверждающими материалами,
+  вспомогательные средства ведения журнала проверок.
+- Дополнительные утилиты для лабораторных данных и амбулаторного мониторинга.
+- Навыки Codex, MCP-сервер для публичной зоны и примеры карточек пациента
+  и решений — только на вымышленных данных.
 
-- PubMed and Crossref bibliographic metadata clients.
-- A catalog and workflow for reviewing official guidelines and primary sources.
-- Basic local document import that never modifies the originals, plus synthetic
-  test data.
-- Typed `CasePacket` and `EvidencePacket` contracts for passing data between stages.
-- Structural checks of links between claims and supporting material, and helpers
-  for keeping a review log.
-- Extra utilities for lab data and ambulatory monitoring.
-- Codex skills, an MCP server for the public zone, and example patient and decision
-  cards — all on fictional data.
+## Модель приватности
 
-## Privacy model
+В публичный репозиторий намеренно **не включены реальные персональные
+медицинские данные, исходные медицинские документы, локальные рабочие базы,
+учётные данные и пользовательские пути**. Приватные архивы должны находиться
+за пределами клона. Всё состояние, создаваемое при работе, должно оставаться
+локальным и исключаться из Git. Перед коммитом проверяйте именно подготовленные
+к нему файлы, а не полагайтесь только на `.gitignore`.
 
-The public repository intentionally contains **no real personal medical data, no
-original medical documents, no local working databases, no credentials and no
-user paths**. Private archives must live outside the clone. All state created at
-runtime must stay local and excluded from Git. Before committing, check the staged
-files themselves rather than relying on `.gitignore` alone.
+Проект разделён на логические зоны доверия:
 
-The project is split into logical trust zones:
-
-| Zone | Purpose | Network | Original private documents |
+| Зона | Назначение | Сеть | Исходные приватные документы |
 | --- | --- | --- | --- |
-| `public` | Metadata and source search | Allowed | Forbidden |
-| `private` | Explicitly allowed local review | Forbidden | Allowed locally |
-| `synthesis` | Combining data from packets without network | Forbidden | Forbidden |
-| `audit` | Structural checks without modifying data | Forbidden | Forbidden |
+| `public` | Поиск метаданных и источников | Разрешена | Запрещены |
+| `private` | Явно разрешённая локальная проверка | Запрещена | Допустимы локально |
+| `synthesis` | Объединение данных из пакетов без сети | Запрещена | Запрещены |
+| `audit` | Структурная проверка без изменения данных | Запрещена | Запрещены |
 
-These are additional layers of protection, not a guarantee of anonymity or user
-isolation. A shared process, task or operating system account can carry
-information across these boundaries.
+Это дополнительные уровни защиты, а не гарантия анонимности или изоляции
+пользователей. Общий процесс, задача или учётная запись операционной системы
+могут переносить информацию через такие границы.
 
-## Quick start
+## Быстрый старт
 
-You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Понадобятся Python 3.11+ и [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --extra dev --extra mcp --extra documents
@@ -61,19 +67,19 @@ uv run pytest
 uv run health-analyzer --help
 ```
 
-If needed, copy `.env.example` to a local configuration file excluded from Git.
-Use placeholder paths such as `/path/to/private-archives` in published examples.
-Never commit real archive paths, patient identifiers, API keys or pseudonymization
-keys.
+При необходимости скопируйте `.env.example` в локальный конфигурационный файл,
+исключённый из Git. В публикуемых примерах используйте условные пути вроде
+`/path/to/private-archives`. Не добавляйте в коммиты реальные пути к архивам,
+идентификаторы пациентов, API-ключи или ключи псевдонимизации.
 
-For the bundled MCP configuration, set `HEALTH_ANALYZER_PROJECT_ROOT` in your local
-environment to the absolute path of the clone. The public configuration
-intentionally keeps a placeholder: it has to stay portable and free of personal
-paths.
+Для встроенной конфигурации MCP задайте в локальном окружении переменную
+`HEALTH_ANALYZER_PROJECT_ROOT` с абсолютным путём к клону. В публичной
+конфигурации намеренно оставлен шаблон: она должна быть переносимой и не
+содержать персональных путей.
 
-The public MCP wrapper for macOS verifies the runtime's integrity against a pinned
-hash. After a reviewed change to that runtime, regenerate the manifest and use its
-current hash. Commands for the current version:
+Обёртка публичного MCP для macOS проверяет целостность среды выполнения по
+зафиксированному хешу. После проверенного изменения этой среды пересоздайте
+манифест и используйте его актуальный хеш. Команды для текущей версии:
 
 ```bash
 scripts/update-runtime-manifest
@@ -81,37 +87,40 @@ scripts/run-public-mcp --expected-runtime-manifest-sha256 \
   d59609898bcf4e62f1bcb8606fa427a6ef7380097ec08544b18a3daf8bd1cc94
 ```
 
-The wrapper deliberately uses strict checks and targets a local macOS environment.
-For development on other platforms, use the CLI and tests from the start of this
-section.
+Обёртка намеренно использует строгие проверки и рассчитана на локальную среду
+macOS. Для разработки на других платформах используйте CLI и тесты из начала
+этого раздела.
 
-## Important limitations
+## Важные ограничения
 
-- Bibliographic metadata does not replace the full text of a study and does not
-  confirm medical claims on its own.
-- The source and guideline cache can go stale. Check currency and applicability
-  against the sources themselves.
-- HMAC receipts only help detect changes locally. They are **not** encryption, a
-  digital signature, reviewer authentication, source verification or clinical
-  expertise.
-- De-identification checks are heuristic. Any public sharing of data still needs
-  human review.
-- Synthetic examples show how data moves, not the completeness of clinical coverage,
-  and they are not medical advice.
+- Библиографические метаданные не заменяют полный текст исследования и сами
+  по себе не подтверждают медицинские утверждения.
+- Кеш источников и рекомендаций может устареть. Актуальность и применимость
+  нужно проверять по самим источникам.
+- Квитанции с HMAC помогают лишь локально обнаруживать изменения. Это **не**
+  шифрование, цифровая подпись, аутентификация проверяющего, проверка источника
+  или клиническая экспертиза.
+- Проверки обезличивания основаны на эвристиках. Перед любой публичной
+  передачей данных всё равно нужна проверка человеком.
+- Синтетические примеры показывают движение данных, а не полноту клинического
+  охвата и не медицинскую рекомендацию.
 
-## Documentation
+## Документация
 
-- [Architecture](docs/architecture.md).
-- [Operations and workflows](docs/operations.md).
-- [Local PDF workflow](docs/local-pdf-workflow.md).
+Подробная техническая документация пока на английском:
 
-## Contributing and security
+- [Архитектура](docs/architecture.md).
+- [Эксплуатация и рабочие процессы](docs/operations.md).
+- [Локальная работа с PDF](docs/local-pdf-workflow.md).
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before proposing changes. Privacy rules,
-credential handling and vulnerability reporting are described in
-[`SECURITY.md`](SECURITY.md). Never put confidential material in public issues,
-pull requests, test data, logs or screenshots.
+## Участие в разработке и безопасность
 
-## License
+Перед предложением изменений прочитайте [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Правила приватности, обращения с учётными данными и сообщения об уязвимостях
+описаны в [`SECURITY.md`](SECURITY.md). Оба документа — на английском.
+Не размещайте конфиденциальные материалы в публичных issues, pull requests,
+тестовых данных, логах или скриншотах.
+
+## Лицензия
 
 [MIT](LICENSE)
