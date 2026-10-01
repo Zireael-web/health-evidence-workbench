@@ -409,6 +409,51 @@
       "size": 10357
     },
     {
+      "path": "src/health_analyzer/v2/__init__.py",
+      "sha256": "669d6d4b4c487d14c7ff2f8c973da4d4c4e7aa8cd6615c823464e82d7dab4f97",
+      "size": 97
+    },
+    {
+      "path": "src/health_analyzer/v2/common.py",
+      "sha256": "0070662303854657e199d770ec0181ddc7ecdd78af74c1e7a2d8afd59cf5deff",
+      "size": 12585
+    },
+    {
+      "path": "src/health_analyzer/v2/configuration.py",
+      "sha256": "a0b54e5ec94a30662e103e285c1a7f7a2323cab7459afc4a2258634579cd067e",
+      "size": 13010
+    },
+    {
+      "path": "src/health_analyzer/v2/contracts.py",
+      "sha256": "fd8bca8183e88d04b5fd7b100c5ccc4f89bec3a6e79a7ccc0552887b65a37231",
+      "size": 18878
+    },
+    {
+      "path": "src/health_analyzer/v2/exercise_scope.py",
+      "sha256": "7bfee4e99b36ea691dd209d40d0802af978c77c24fa5785fe7d4dfcbbb32460c",
+      "size": 4486
+    },
+    {
+      "path": "src/health_analyzer/v2/migration.py",
+      "sha256": "768559db45b9be5daf5171b3b219d8b1a35394222b9c5c0dd434716b7af5cdbd",
+      "size": 40246
+    },
+    {
+      "path": "src/health_analyzer/v2/private_cases.py",
+      "sha256": "2e5fd33225341c89b775bc4bdd2ebd4d55388c6bfe264f4bb8a216b57b608a9f",
+      "size": 28622
+    },
+    {
+      "path": "src/health_analyzer/v2/records.py",
+      "sha256": "68b59ed07d6b303a6f74f1581fb1589e3ddb855ef33fd512bbcd145d87d77626",
+      "size": 72799
+    },
+    {
+      "path": "src/health_analyzer/v2/unit_text.py",
+      "sha256": "c9bdd70f4695768f63c4414751b869ab58737b0d3acd3262449524bab2ed8fc3",
+      "size": 5164
+    },
+    {
       "path": "src/health_analyzer/vault/__init__.py",
       "sha256": "c428f954b610c891c081eeaf0afe3ba7bc4b980971e00a7abc55ed941df7352d",
       "size": 843
