@@ -74,6 +74,11 @@
       "size": 3367
     },
     {
+      "path": "scripts/ha-local",
+      "sha256": "6b5d5b2b95cbdb576f66dae76830946a43d36835682d86bb20e65e9a58efa49d",
+      "size": 277
+    },
+    {
       "path": "scripts/render-sandbox-profile",
       "sha256": "a47bd2ea0ad343133e9f1a578b3edb6917be9983154376e27ce234dbecaf855b",
       "size": 2476
@@ -270,8 +275,8 @@
     },
     {
       "path": "src/health_analyzer/ingest/extractors.py",
-      "sha256": "7531951cb2895ce68b5a6735a9cde78bc518819b1f75b99f7ac554868c604f40",
-      "size": 12650
+      "sha256": "5b01211ec6ebd8f16e6c384eafdc01ba1c26077ce5061e518139f05a0873a53d",
+      "size": 12138
     },
     {
       "path": "src/health_analyzer/ingest/models.py",
@@ -355,18 +360,23 @@
     },
     {
       "path": "src/health_analyzer/local_cli.py",
-      "sha256": "9f7fe24c4a023aff3cf6659a8fba8e6514aa991add64c3a06bae33f74453e9cd",
-      "size": 5874
+      "sha256": "fe31d9c6b6add3631b710f8a88dbdf1dfa80541ade036923bf52ed40431d1461",
+      "size": 6996
+    },
+    {
+      "path": "src/health_analyzer/local_document_entry.py",
+      "sha256": "4c8bc65d7520a52b5a4b687f2d5cb5a7b14ccad29b47d5be0b3717f2207d179b",
+      "size": 413
     },
     {
       "path": "src/health_analyzer/local_documents.py",
-      "sha256": "e05a4904bdafc15be948f77b7be3c64e805817ae032c931b3f67209ed3dfeffa",
-      "size": 29816
+      "sha256": "ce57189540a4007577bcbc43d0cdd1c123d1e92fafd2ad47ededbaadb9d3b088",
+      "size": 30626
     },
     {
       "path": "src/health_analyzer/local_intake.py",
-      "sha256": "f6798698ea8fe5fb551e2192fd2e7995d42b3c0186aa16c65ceb5e42d815d5c4",
-      "size": 13759
+      "sha256": "fae1d5886757dec58a556ae375b13408e3884e28a711a4d99f4e1e66b693ec63",
+      "size": 21200
     },
     {
       "path": "src/health_analyzer/mcp_server.py",
@@ -414,6 +424,11 @@
       "size": 97
     },
     {
+      "path": "src/health_analyzer/v2/attachments.py",
+      "sha256": "733ae289297a959efe796439f252711f5d9bf1d0eb7437b854aa21d7db6f4202",
+      "size": 18233
+    },
+    {
       "path": "src/health_analyzer/v2/common.py",
       "sha256": "0070662303854657e199d770ec0181ddc7ecdd78af74c1e7a2d8afd59cf5deff",
       "size": 12585
@@ -429,14 +444,79 @@
       "size": 18878
     },
     {
+      "path": "src/health_analyzer/v2/delimited.py",
+      "sha256": "49fa8578de2663c21312ca89c0dd9e095c8e11f42d623cc3896ce271a3b75860",
+      "size": 10223
+    },
+    {
+      "path": "src/health_analyzer/v2/document_io.py",
+      "sha256": "46ae61b10d00926aee0326b6f4a50df5b0ed48bcfe6997c1cd9cf062e0175155",
+      "size": 32978
+    },
+    {
       "path": "src/health_analyzer/v2/exercise_scope.py",
       "sha256": "7bfee4e99b36ea691dd209d40d0802af978c77c24fa5785fe7d4dfcbbb32460c",
       "size": 4486
     },
     {
+      "path": "src/health_analyzer/v2/import_issues.py",
+      "sha256": "2b043de0d07077fc792992bbef7e890187833adeb34aba6a2942abb68921497b",
+      "size": 12261
+    },
+    {
+      "path": "src/health_analyzer/v2/ingest.py",
+      "sha256": "f9d993b95c797419afc5f1c64dfe09e9e96dbbb9c6cd2bd03313b50cd80957ad",
+      "size": 40179
+    },
+    {
+      "path": "src/health_analyzer/v2/layout.py",
+      "sha256": "c32e50473dd554433728046df3de2723f622bda11dd0454eb6c046425eb9d07f",
+      "size": 87140
+    },
+    {
       "path": "src/health_analyzer/v2/migration.py",
       "sha256": "768559db45b9be5daf5171b3b219d8b1a35394222b9c5c0dd434716b7af5cdbd",
       "size": 40246
+    },
+    {
+      "path": "src/health_analyzer/v2/native/pdf-geometry.sb",
+      "sha256": "7052277c9f5481e5b9514525975ac41f9c400aeda5e211bb8f14e6aa1f1309f5",
+      "size": 982
+    },
+    {
+      "path": "src/health_analyzer/v2/ocr_review.py",
+      "sha256": "0971cbdc93ca0bca4f95960f8185dc6d5a6dc60fb6b7d86f0a4e22178d290b11",
+      "size": 7545
+    },
+    {
+      "path": "src/health_analyzer/v2/originals.py",
+      "sha256": "b2dc9a03dfee329e52b0bb8067eb97429485fa77ac374fe40ed5ae91743de1bd",
+      "size": 18804
+    },
+    {
+      "path": "src/health_analyzer/v2/pdf-parser.sb",
+      "sha256": "9e45baed85bf380befc22ca06d5dc3c47cc9584181c398b2771bbab7a6f8cb92",
+      "size": 811
+    },
+    {
+      "path": "src/health_analyzer/v2/pdf_bridge.py",
+      "sha256": "53ab8df985939ddbcf95933a11b246eafe592dd15e66bb8d8b19bc905c65e50f",
+      "size": 16094
+    },
+    {
+      "path": "src/health_analyzer/v2/pdf_geometry.py",
+      "sha256": "d43108f91c2d7911d7a249a790f4f312fdfcce469614d77f3c26270556579bad",
+      "size": 6376
+    },
+    {
+      "path": "src/health_analyzer/v2/pdf_geometry_worker.py",
+      "sha256": "1d4a7e8fcf3872d979d64a5f1e11d8facf212668c87d3e1a81a9dd87d6f325dc",
+      "size": 6408
+    },
+    {
+      "path": "src/health_analyzer/v2/pdf_worker.py",
+      "sha256": "bedf2979ba3623be83e6389879ece475b47c2193df3ead9aa7e20aa9eacfe7eb",
+      "size": 364
     },
     {
       "path": "src/health_analyzer/v2/private_cases.py",
@@ -452,6 +532,11 @@
       "path": "src/health_analyzer/v2/unit_text.py",
       "sha256": "c9bdd70f4695768f63c4414751b869ab58737b0d3acd3262449524bab2ed8fc3",
       "size": 5164
+    },
+    {
+      "path": "src/health_analyzer/v2/vision.py",
+      "sha256": "d8d6e1090f0a259e7dbdcdf7f09cdc119ca4fd80c1d3673f9edbfa8287729878",
+      "size": 14770
     },
     {
       "path": "src/health_analyzer/vault/__init__.py",

@@ -84,7 +84,7 @@ uv run health-analyzer --help
 ```bash
 scripts/update-runtime-manifest
 scripts/run-public-mcp --expected-runtime-manifest-sha256 \
-  4d3b8d0cf90573d905eeb013755cacaeae0c4615437b0ec30e232aaf28c38a68
+  40ece98e3462c95010369d49d6733dc1dbbbd6deed0553e2b8a9f55834fae45b
 ```
 
 Обёртка намеренно использует строгие проверки и рассчитана на локальную среду

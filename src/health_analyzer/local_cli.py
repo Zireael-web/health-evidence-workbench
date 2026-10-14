@@ -39,6 +39,14 @@ def add_local_pdf_parser(subparsers: argparse._SubParsersAction) -> None:
     render.add_argument("--render-parent", type=Path, required=True)
     render.add_argument("--dpi", type=int, default=120)
     render.add_argument("--output", type=Path, help="New JSON page manifest, without overwriting")
+    transcript = operations.add_parser(
+        "save-text", help="Save the dialogue model's full UTF-8 text beside a preserved PDF",
+    )
+    transcript.add_argument("source", type=Path, help="Preserved PDF in the selected patient folder")
+    transcript.add_argument("--text-file", type=Path, required=True,
+                            help="Complete UTF-8 transcription produced by ChatGPT/Codex")
+    transcript.add_argument("--expected-sha256", required=True,
+                            help="SHA-256 of the preserved PDF actually read by the model")
 
 
 def _output_parent(path: Path) -> tuple[int, str]:
@@ -95,6 +103,20 @@ def _check_output_available(path: Path) -> None:
 
 
 def execute_local_pdf(args: argparse.Namespace) -> None:
+    if args.local_operation == "save-text":
+        from .local_intake import read_model_transcript, save_model_transcript
+
+        result = save_model_transcript(
+            args.source, read_model_transcript(args.text_file),
+            expected_sha256=args.expected_sha256,
+        )
+        print(json.dumps({
+            "status": result.status, "path": str(result.path),
+            "sha256": result.sha256, "method": "dialogue_model_supplied_text",
+            "review_status": "unverified",
+        }, ensure_ascii=False, sort_keys=True))
+        return
+
     from .local_documents import inspect_local_pdf
 
     if args.output:

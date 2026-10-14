@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Run the local PDF workflow from source without an installed package."""
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from health_analyzer.cli import main
+
+main(["local-pdf", *sys.argv[1:]])
