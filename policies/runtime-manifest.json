@@ -79,6 +79,11 @@
       "size": 277
     },
     {
+      "path": "scripts/ha-v2",
+      "sha256": "8a0ffd113c01a9a119a42f1368a1823b5a9ad26e4ef3d290a1644fcdcf32980a",
+      "size": 280
+    },
+    {
       "path": "scripts/render-sandbox-profile",
       "sha256": "a47bd2ea0ad343133e9f1a578b3edb6917be9983154376e27ce234dbecaf855b",
       "size": 2476
@@ -102,6 +107,16 @@
       "path": "scripts/run-synthesis-mcp",
       "sha256": "2c846074e688dc5544651643242743405d8180e54c1951790841c5e82bec40c4",
       "size": 3217
+    },
+    {
+      "path": "scripts/run-v2-private-data",
+      "sha256": "8efd06eedcbc24601c5182a1cc7bbcf25a5acb94f3eadac9d26b60a1f7555624",
+      "size": 536
+    },
+    {
+      "path": "scripts/run-v2-public-research",
+      "sha256": "3af9cf71ec3f677cd699552ed847d9f675ad11fc8d74e439114082d52e1ffd96",
+      "size": 539
     },
     {
       "path": "scripts/update-runtime-manifest",
@@ -429,6 +444,11 @@
       "size": 18233
     },
     {
+      "path": "src/health_analyzer/v2/cli.py",
+      "sha256": "0d3ecf82e76f553476b5989bbf0c36c6c156766e388785e8d8dcbed9ff754ede",
+      "size": 26676
+    },
+    {
       "path": "src/health_analyzer/v2/common.py",
       "sha256": "0070662303854657e199d770ec0181ddc7ecdd78af74c1e7a2d8afd59cf5deff",
       "size": 12585
@@ -452,6 +472,11 @@
       "path": "src/health_analyzer/v2/document_io.py",
       "sha256": "46ae61b10d00926aee0326b6f4a50df5b0ed48bcfe6997c1cd9cf062e0175155",
       "size": 32978
+    },
+    {
+      "path": "src/health_analyzer/v2/entry.py",
+      "sha256": "95cdd8332594dc9ebe2cd37a0d887281a87f166e748cd73cecda12163ad56a0e",
+      "size": 351
     },
     {
       "path": "src/health_analyzer/v2/exercise_scope.py",
@@ -519,14 +544,54 @@
       "size": 364
     },
     {
+      "path": "src/health_analyzer/v2/preview.py",
+      "sha256": "f4a45b8a13adc61a217a3a8aa668ab0bdd28c599d46341244cacc7a009584f13",
+      "size": 63176
+    },
+    {
+      "path": "src/health_analyzer/v2/private_answers.py",
+      "sha256": "0fa46c7877ebacb2ea7931957717a591626dcd34e4f7649e996712df746588ef",
+      "size": 23155
+    },
+    {
+      "path": "src/health_analyzer/v2/private_calculations.py",
+      "sha256": "fbea94c75f3673951099e0dea211419f241beb7d827759f1574e3cf3463082ed",
+      "size": 25964
+    },
+    {
       "path": "src/health_analyzer/v2/private_cases.py",
       "sha256": "2e5fd33225341c89b775bc4bdd2ebd4d55388c6bfe264f4bb8a216b57b608a9f",
       "size": 28622
     },
     {
+      "path": "src/health_analyzer/v2/providers.py",
+      "sha256": "4859d2978f245f69097c86bd101c6335185782601405e4d222cbf939737ab8c1",
+      "size": 18563
+    },
+    {
       "path": "src/health_analyzer/v2/records.py",
       "sha256": "68b59ed07d6b303a6f74f1581fb1589e3ddb855ef33fd512bbcd145d87d77626",
       "size": 72799
+    },
+    {
+      "path": "src/health_analyzer/v2/recovery.py",
+      "sha256": "a0519c0264180d4e5f58219aabd67fe6637d4b55564fe127eae1aab57e5919b4",
+      "size": 47620
+    },
+    {
+      "path": "src/health_analyzer/v2/research.py",
+      "sha256": "7e89a63d8d4d82dacb5ecc33e867cd4293ef850394b523b0de77ce224e08002d",
+      "size": 31679
+    },
+    {
+      "path": "src/health_analyzer/v2/review.py",
+      "sha256": "bddaafb11e36082f6026d32f3fba7f560d9da744685dff8114b7bd84f218cdce",
+      "size": 13666
+    },
+    {
+      "path": "src/health_analyzer/v2/runtime.py",
+      "sha256": "e7ee9374089dcff52f3f4552f70b768d95da8f958691a37ca8a0ac599f4490ff",
+      "size": 15052
     },
     {
       "path": "src/health_analyzer/v2/unit_text.py",
