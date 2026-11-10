@@ -12,15 +12,14 @@ and currency still fit; inspect material changes before reusing them.
 
 ## Plan and retrieve
 
-Derive and visibly inspect a minimal public question before any external search.
-Exclude names, contact data, private paths/IDs, raw reports and exact individual
-event dates. Do not send a patient table by default. A necessary clinical
-threshold may be included with its purpose; never replace a real value with an
-invented range. The shared conversation can receive private facts; this is
-logical separation, not a model confidentiality boundary.
+Inspect every public-tool payload, including ordinary web searches: exclude names,
+contact data, private paths/IDs, raw reports, patient tables and exact individual
+event dates. Use a minimal deidentified question. A necessary clinical threshold
+may be included with its purpose; never invent a range. The shared conversation
+can receive private facts; this is not a model confidentiality boundary.
 
-Use `plan_search` with the question type, explicit strategies and budget. The
-default concepts omit mandatory outcome/comparator AND filters. For harms,
+When v2 tools are available, use `plan_search` with question type, strategies and
+budget. Default concepts omit mandatory outcome/comparator AND filters. For harms,
 diagnosis, prognosis, etiology and prevalence consider the appropriate primary
 designs; do not restrict every question to trials and reviews. Retain older
 landmark work, null/negative findings and contradictions. Separate clinical
@@ -36,9 +35,13 @@ in the query. A budget cap means limited coverage, not no evidence or a systemat
 review. Host browser/search results remain model reported and cannot fabricate
 backend executed-page receipts.
 
+If v2 tools or provider are unavailable, use available public search under the
+same privacy rules; never invent backend receipts. If no current sources can be
+inspected, say so and limit claims instead of inventing current recommendations.
+
 ## Read sources and retain findings
 
-Register actual public sources, then record access with checked URL, date,
+When using the v2 public backend, register actual sources and record access with checked URL, date,
 availability, text extent and inspected scope/locators. Distinguish metadata,
 abstract, selected sections and complete text. A downloaded article is not
 necessarily a fully inspected article. The PubMed backend stores actual XML bytes
@@ -46,7 +49,8 @@ and separately hashes the rendered abstract; neither hash describes publisher
 full text. Web-only access is `model_reported` with no backend article hash.
 Never invent a hash or backend fetch receipt.
 
-Record atomic findings supported by the text actually inspected: population,
+Record atomic findings supported by the text actually inspected, in working
+notes when no backend is available: population,
 design, intervention/comparator, outcome, follow-up, benefit/harm/null/recommendation,
 printed effect/CI/denominator, exact excerpt/locator and limitations. Metadata
 alone does not support effects. Abstract-only findings remain limited to what
@@ -64,10 +68,29 @@ search gap, not proof that none exists. A registry/cache is optional.
 
 ## Answer
 
-Use dossier findings and selected private observations in the main conversation.
+Use inspected findings, a dossier when available, and selected private
+observations in the main conversation.
 Keep source facts, user notes, calculations, inferences and options for discussion
 distinct. Exact support IDs establish traceability, not semantic entailment.
 Show practical implications, uncertainty, missing context and source links.
+
+Apply this to any readable medical result or written examination report, not a
+fixed list of specialties. Distinguish the reported finding from possible causes,
+diagnoses and next steps; do not claim to have inspected images or signals when
+only their written report was available. Note unreadable or unavailable material.
+
+For treatment or prevention, distinguish guideline recommendations from options
+with limited evidence and from options shown ineffective or advised against.
+By default, also seek relevant non-standard options with preliminary research,
+including supplements, interventions and procedures; omit irrelevant ones.
+Identify the study type and quality, applicability, harms and interactions;
+preclinical or preliminary data do not establish efficacy or safety. Name the
+guideline and date; state recommendation strength separately from evidence
+certainty, marking either not reported or not assessed instead of inventing it.
+Absence of evidence is not evidence of no effect; omission from a guideline is
+not proof of harm. Do not invent doses or extrapolate from unrelated populations
+or outcomes. Distinguish a study regimen from personal advice; report missing
+context that affects decisions.
 
 Use `health-review` for personal interpretations, clinical-action drafts,
 material quantitative conclusions, contradictions and broad research. Simple

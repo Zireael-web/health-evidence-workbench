@@ -30,6 +30,12 @@ the claim coverage, severity, source/locator, reason and needed correction:
   formula and rounding; do not treat a displayed formula as calculated proof.
 - **Reasoning:** separate association/causation, clinical/surrogate/preclinical
   outcomes, inferences and contradiction handling.
+- **Medical documents:** check that the draft distinguishes a written report
+  from unviewed images or signals, and exposes unreadable or missing material.
+- **Options:** check guideline recommendation strength separately from evidence
+  certainty; distinguish limited data, evidence of no benefit and advice against.
+  Check applicable populations, study regimens, harms and interactions without
+  presenting an unverified dose as a personal treatment recommendation.
 - **Safety context:** relevant age/special states, conditions, medication,
   allergies, kidney/liver function, contraindications and urgent symptoms.
   Mark each necessary field known/unknown/not applicable and explain its impact;
@@ -40,7 +46,9 @@ the claim coverage, severity, source/locator, reason and needed correction:
 The v2 `review_answer` tool accepts **public evidence drafts only**. It checks
 schemas and finding lineage locally and stores separately attributed model
 checks. Do not send a CaseSelection, personal lab table or private notes to it.
-For personal drafts, use the existing private-data runtime when available:
+For personal drafts that rely on an existing, relevant typed case selection,
+use the private-data runtime when available and verify freshness. Do not import
+a file just to run review:
 
 1. Read `get_case_selection` with the exact subject, selection ID and hash. Use
    only its selected observations and context. Inspect the separate freshness;
@@ -68,9 +76,9 @@ that a corrected value was literally printed, or that a clinical conclusion is
 appropriate. Its report always remains `needs_revision`, with semantic, medical
 and human validation `not_provided`. Perform the substantive checks above
 separately and retain their coverage; never promote or overwrite that report.
-If the private tools are unavailable, review the personal synthesis in the
-private-context conversation and state that persisted backend resolution was
-not performed. Do not fabricate a successful backend case check.
+For file-only review or unavailable private tools, review the synthesis in the
+private-context conversation. State when relevant that persisted backend
+resolution was not performed; never fabricate a successful backend case check.
 
 ## Release
 

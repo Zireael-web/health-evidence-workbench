@@ -1,6 +1,6 @@
 {
   "name": "health-analyzer-v2",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Three personal health workbench skills with public-only stdio research tools. Private records use a separate explicit project runtime.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

@@ -76,13 +76,6 @@ def main(argv: list[str] | None = None) -> None:
 
     add_local_pdf_parser(subparsers)
 
-    cards_demo = subparsers.add_parser(
-        "cards-demo", help="Render fictional cards only; never reads private data",
-    )
-    cards_demo.add_argument("--card", choices=("patient", "decision"), default="patient")
-    cards_demo.add_argument("--format", choices=("json", "markdown", "html"), default="markdown")
-    cards_demo.add_argument("--output", help="Create a new synthetic demo file; refuses overwrite")
-
     route = subparsers.add_parser("route", help="Build a trust-zone plan")
     route.add_argument("question_class", choices=[kind.value for kind in QuestionClass])
     route.add_argument("--private", action="store_true")
@@ -177,23 +170,6 @@ def main(argv: list[str] | None = None) -> None:
         from .local_cli import execute_local_pdf
 
         execute_local_pdf(args)
-    elif args.command == "cards-demo":
-        from .cards.demo import demo_card
-        from .cards.rendering import render_card_html, render_card_markdown
-
-        card = demo_card(args.card)
-        content = (
-            json.dumps(card, ensure_ascii=False, indent=2, sort_keys=True)
-            if args.format == "json" else
-            render_card_html(card) if args.format == "html" else render_card_markdown(card)
-        )
-        if args.output:
-            # All content is built before opening a file. Exclusive creation
-            # refuses both existing files and symlinks; this CLI has no PHI input.
-            with open(args.output, "x", encoding="utf-8") as stream:
-                stream.write(content + "\n")
-        else:
-            print(content)
     elif args.command == "route":
         _print(
             asdict(

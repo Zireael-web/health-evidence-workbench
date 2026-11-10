@@ -155,6 +155,26 @@ def test_egress_packet_removes_source_identity_and_preserves_clinical_facts() ->
     assert summary[("statements[0].support_ids", "external_or_internal_reference")] == 1
 
 
+def test_egress_notice_warns_unknown_location_may_remain_until_human_review() -> None:
+    # The invented place is intentionally absent from the known-location rules.
+    question = "Could regional protocols in Zqorvellen affect this review?"
+    preview = build_egress_case_packet(_case_packet(), question=question)
+
+    assert "Zqorvellen" in preview.payload["question"]
+    notice = preview.payload["deidentification_notice"].lower()
+    assert "names" in notice and "locations" in notice and "other identifiers" in notice
+    assert "may remain" in notice
+    assert "human" in notice and "review the exact payload" in notice
+    assert "do not guarantee anonymity" in notice
+
+    # A human can supply the exact missed identifier to the existing local
+    # deny-list, but its use is not proof that no other identifiers remain.
+    redacted = build_egress_case_packet(
+        _case_packet(), question=question, additional_identifiers=("Zqorvellen",)
+    )
+    assert "Zqorvellen" not in redacted.payload["question"]
+
+
 def test_egress_ids_are_fresh_for_every_request_and_not_stable_per_patient() -> None:
     source = _case_packet()
     first = build_egress_case_packet(source)

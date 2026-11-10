@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Copy explicitly selected documents and save caller-supplied transcripts.
+
+This entry point does not read a model, infer identity, or access the network.
+Use an explicit archive root for every operation. Errors never echo inputs.
+After an error, an original or sidecar may already have been published. A hard
+interruption can leave a temporary hardlink and require manual inspection; this
+tool never removes candidate links automatically.
+Folder creation does not isolate against a concurrent process moving or
+replacing folders. On failure, partial folders may remain, including in a
+parent moved outside the selected root by such a process.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from health_analyzer.document_files import (HardlinkReviewRequired, copy_authorized_document, ensure_folder,
+    inspect_pending_publication, read_supplied_transcript, read_supplied_transcript_stream,
+    read_supplied_transcript_tty, save_document_transcript)
+from health_analyzer.file_archive import ArchiveError, load_profiles, select_profile
+from health_analyzer.local_intake import (IntakeConflictError, LocalIntakeError,
+                                          _directory, _regular_file, _snapshot)
+
+
+class InvalidArguments(Exception):
+    pass
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        # argparse normally echoes invalid arguments, which may contain private data.
+        raise InvalidArguments
+
+
+def absolute_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute() or ".." in path.parts:
+        raise argparse.ArgumentTypeError("An absolute, non-traversing path is required")
+    return path
+
+
+def parser() -> Parser:
+    result = Parser(description="Store an explicitly selected file or supplied transcript locally.")
+    operations = result.add_subparsers(dest="operation", required=True)
+    copy = operations.add_parser("copy", help="Copy one selected file without replacing existing files")
+    copy.add_argument("--source", required=True, type=absolute_path)
+    add_profile_options(copy)
+    copy.add_argument("--destination", help="Optional path relative to the archive root")
+    copy.add_argument("--expected-sha256", help="Optional previously inspected source hash")
+    text = operations.add_parser("save-text", help="Save supplied text beside the selected original")
+    text.add_argument("--document", required=True, type=absolute_path)
+    add_profile_options(text)
+    text_input = text.add_mutually_exclusive_group(required=True)
+    text_input.add_argument("--text-file", type=absolute_path, help="Read an existing UTF-8 file; never delete it")
+    text_input.add_argument("--text-stdin", action="store_true", help="Read bounded UTF-8 text from standard input")
+    text_input.add_argument("--text-tty", action="store_true", help="Read a two-phase bounded no-echo terminal frame")
+    text.add_argument("--expected-sha256", required=True, help="Hash of the preserved original")
+    inspect = operations.add_parser("inspect-pending", help="Read-only inspection of an interrupted publication")
+    add_profile_options(inspect)
+    inspect.add_argument("--destination", required=True, help="Destination path relative to the selected profile")
+    inspect.add_argument("--expected-sha256", required=True, help="Previously known hash of the destination")
+    folder = operations.add_parser(
+        "ensure-folder", help="Create an explicit folder under the chosen profile",
+        description=("Concurrent folder moves are not isolated. On error, partial directories may "
+                     "remain, including in a concurrently moved parent outside the selected root."),
+    )
+    add_profile_options(folder)
+    folder.add_argument("--folder", required=True, help="Folder path relative to the selected profile")
+    return result
+
+
+def add_profile_options(operation: argparse.ArgumentParser) -> None:
+    identity = operation.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--archive-root", type=absolute_path, help="Explicit direct subject root")
+    identity.add_argument("--config", type=absolute_path, help="Explicit private profile configuration")
+    operation.add_argument("--profile", help="Explicit profile ID or label; required with --config")
+
+
+def config_snapshot(path: Path) -> tuple:
+    """Bind profile selection to a stable, explicitly selected config file."""
+    with _directory(path.parent) as parent, _regular_file(parent, path.name) as fd:
+        opened = os.fstat(fd)
+        named = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        if opened.st_nlink != 1 or _snapshot(opened) != _snapshot(named):
+            raise ArchiveError("Profile configuration changed or has unexpected links.")
+        return (*_snapshot(opened), opened.st_nlink)
+
+
+def main() -> int:
+    try:
+        args = parser().parse_args()
+        if bool(args.config) != bool(args.profile):
+            raise InvalidArguments
+        config_before = config_snapshot(args.config) if args.config else None
+        chosen = select_profile(load_profiles(args.config), args.profile) if args.config else None
+        if chosen and config_snapshot(args.config) != config_before:
+            raise ArchiveError("Selected profile configuration changed during selection.")
+        root = chosen.root if chosen else args.archive_root
+        expected_root = (chosen.device, chosen.inode) if chosen else None
+        if args.operation == "copy":
+            saved = copy_authorized_document(
+                args.source, root, args.destination,
+                expected_sha256=args.expected_sha256, expected_root_identity=expected_root,
+            )
+            extra = {"identity_assignment": "explicit_profile" if chosen else "caller_selected_archive_root"}
+        elif args.operation == "save-text":
+            if args.text_stdin and sys.stdin.isatty():
+                raise InvalidArguments
+            if args.text_tty:
+                transcript = read_supplied_transcript_tty(
+                    sys.stdin.buffer, lambda marker: print(marker, flush=True)
+                )
+            elif args.text_stdin:
+                transcript = read_supplied_transcript_stream(sys.stdin.buffer)
+            else:
+                transcript = read_supplied_transcript(args.text_file)
+            saved = save_document_transcript(
+                args.document, transcript,
+                archive_root=root, expected_sha256=args.expected_sha256, expected_root_identity=expected_root,
+            )
+            extra = {"method": "caller_supplied_text", "review_status": "unverified"}
+        elif args.operation == "ensure-folder":
+            folder = ensure_folder(root, args.folder, expected_root_identity=expected_root)
+        else:
+            inspection = inspect_pending_publication(root, args.destination, expected_sha256=args.expected_sha256,
+                                                      expected_root_identity=expected_root)
+        if chosen and (select_profile(load_profiles(args.config), chosen.id) != chosen
+                       or config_snapshot(args.config) != config_before):
+            raise ArchiveError("Selected profile changed during operation.")
+    except InvalidArguments:
+        print(json.dumps({"error": "invalid_arguments"}))
+        return 2
+    except IntakeConflictError:
+        print(json.dumps({"error": "destination_conflict", "partial_write_possible": True}))
+        return 1
+    except HardlinkReviewRequired:
+        print(json.dumps({"error": "hardlink_review_required", "partial_write_possible": True,
+                          "next_step": "inspect_pending_without_deleting"}))
+        return 1
+    except (LocalIntakeError, ArchiveError, OSError, ValueError):
+        error = {"error": "operation_failed", "partial_write_possible": True}
+        if "args" in locals() and args.operation == "ensure-folder":
+            error["partial_folder_possible"] = True
+            error["concurrent_moves_may_leave_folders_outside_root"] = True
+        print(json.dumps(error))
+        return 1
+    if args.operation == "inspect-pending":
+        print(json.dumps(inspection, ensure_ascii=False, sort_keys=True))
+    elif args.operation == "ensure-folder":
+        print(json.dumps({"status": folder.status, "path": str(folder.path),
+                          "created_count": folder.created_count, "warnings": folder.warnings},
+                         ensure_ascii=False, sort_keys=True))
+    else:
+        print(json.dumps({"status": saved.status, "path": str(saved.path),
+                          "sha256": saved.sha256, "warnings": saved.warnings, **extra}, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

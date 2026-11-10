@@ -126,14 +126,16 @@ is a recognition heuristic and does not validate clinical values or identities.
 
 ## Remaining work
 
-This increment does not migrate legacy records, add a production live search
-provider, implement unit conversions, guarantee handwritten/complex table recognition, or authenticate
+This increment does not migrate legacy records, implement unit conversions,
+guarantee handwritten/complex table recognition, or authenticate
 local human presence. Public source access is model-attested; metadata-only
 citations do not support substantive effects. Personal explanation/review is
 model orchestration, not a hidden local medical-model service.
 
-Public research defaults to `provider_unavailable`; native Codex public browsing
-can supply honestly attributed inspected source records through the skills.
+Public research defaults to `provider_unavailable`; a bounded PubMed adapter can
+be explicitly configured, while native Codex public browsing can supply
+honestly attributed inspected source records through the skills. The preparation
+helper configures PubMed but does not verify live network access.
 See [research contracts](research.md). Model quality evals and all final-release
 criteria in the approved TЗ remain distinct from deterministic code tests.
 

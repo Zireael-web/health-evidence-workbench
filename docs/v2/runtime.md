@@ -91,10 +91,13 @@ registration are not a transport surface. The source checker is wired into
 review commits. Model callers cannot select `operation_context=operator` or
 `migration`, or upgrade an attestation to authenticated human provenance.
 
-Public tools: `plan_search`, `execute_search`, `register_source`,
-`record_source_access`, `record_finding`, `build_dossier`, `review_answer`.
-No provider is configured in this increment: `execute_search` returns a
-provider-unavailable error rather than pretending to have searched. Public
+Public tools: `plan_search`, `execute_search`, `get_search_results`,
+`register_source`, `record_source_access`, `fetch_source_abstract`,
+`record_finding`, `build_dossier`, `review_answer`. No provider is enabled by
+default; without one, `execute_search` returns `provider_unavailable`. Explicit
+`research_provider: {"name": "pubmed"}` enables the bounded PubMed adapter.
+The local preparation helper configures it but does not test live network access.
+See [research contracts](research.md) for scope and limits. Public
 answer review accepts public evidence only; it does not resolve personal
 case facts. Personal interpretation remains a model orchestration operation
 over minimal selected facts, with separate substantive review when required.

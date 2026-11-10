@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Check local document/profile operations with synthetic temporary data.
+
+This is not an installer or a medical, privacy, or plugin readiness check.
+No network calls, configured archive paths, or existing documents are used.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import subprocess
+import sys
+import tempfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+NOT_CHECKED = [
+    "Codex plugin installation, skill selection and tool permissions",
+    "Attachment delivery, visual PDF reading, OCR and transcription accuracy",
+    "Existing archives, patient identification and complete history search",
+    "Public search, source review, confidentiality and medical correctness",
+]
+
+
+def check_local_files() -> None:
+    """Exercise the shipped CLI workflows using only temporary invented data."""
+    if sys.version_info < (3, 11):
+        raise RuntimeError("Python 3.11 or later is required")
+    if os.name != "posix" or any(not hasattr(os, name) for name in ("O_NOFOLLOW", "O_DIRECTORY", "O_CLOEXEC")):
+        raise RuntimeError("The local document workflow requires POSIX filesystem support")
+    scripts = {name: ROOT / "scripts" / name
+               for name in ("health-document", "health-duplicates", "health-files")}
+    if any(not path.is_file() for path in scripts.values()):
+        raise RuntimeError("The checkout does not contain all local document commands")
+
+    def command(name: str, *arguments: str, input_text: str | None = None,
+                expect_success: bool = True) -> dict:
+        result = subprocess.run([sys.executable, "-I", "-B", str(scripts[name]), *map(str, arguments)],
+                                input=input_text, capture_output=True, text=True, timeout=30, check=False)
+        if (result.returncode == 0) != expect_success:
+            raise RuntimeError("Synthetic " + name + " command returned an unexpected status")
+        try:
+            parsed = json.loads(result.stdout if result.stdout else result.stderr)
+        except ValueError as exc:
+            raise RuntimeError("Synthetic " + name + " command returned invalid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise RuntimeError("Synthetic " + name + " command returned an invalid result")
+        return parsed
+
+    with tempfile.TemporaryDirectory(prefix="health-workbench-check-") as directory:
+        temporary_root = Path(directory).resolve()
+        token = secrets.token_hex(8)
+        source = temporary_root / "invented.bin"
+        first = temporary_root / ("profile-" + secrets.token_hex(8))
+        second = temporary_root / ("profile-" + secrets.token_hex(8))
+        first.mkdir(mode=0o700)
+        second.mkdir(mode=0o700)
+        config = temporary_root / "profiles.json"
+        identity = "profile_" + secrets.token_hex(6)
+        other = "profile_" + secrets.token_hex(6)
+        config.write_text(json.dumps({"profiles": [
+            {"id": identity, "label": "Synthetic " + identity, "root": str(first)},
+            {"id": other, "label": "Synthetic " + other, "root": str(second)},
+        ]}), encoding="utf-8")
+        config.chmod(0o600)
+        content_bytes = ("Synthetic file " + token).encode()
+        source.write_bytes(content_bytes)
+        folder = "folder-" + secrets.token_hex(6) + "/nested"
+        created = command("health-document", "ensure-folder", "--config", config,
+                          "--profile", identity, "--folder", folder)
+        expected_folder = first / folder
+        if (created.get("status") != "created" or created.get("created_count") != 2
+                or Path(created.get("path", "")) != expected_folder or not expected_folder.is_dir()
+                or (expected_folder.stat().st_mode & 0o777) != 0o700):
+            raise RuntimeError("Synthetic folder creation failed")
+        repeat_folder = command("health-document", "ensure-folder", "--config", config,
+                                "--profile", identity, "--folder", folder)
+        if repeat_folder.get("status") != "already_present":
+            raise RuntimeError("Repeating synthetic folder creation did not reuse the folder")
+        destination = folder + "/" + source.name
+        copied = command("health-document", "copy", "--source", source, "--config", config,
+                         "--profile", identity, "--destination", destination)
+        saved_file = first / destination
+        expected_hash = hashlib.sha256(content_bytes).hexdigest()
+        if (copied.get("status") != "copied" or copied.get("sha256") != expected_hash
+                or copied.get("identity_assignment") != "explicit_profile"
+                or Path(copied.get("path", "")) != saved_file or saved_file.read_bytes() != content_bytes):
+            raise RuntimeError("Synthetic document copy failed")
+        repeated = command("health-document", "copy", "--source", source, "--config", config,
+                           "--profile", identity, "--destination", destination)
+        if repeated.get("status") != "already_present":
+            raise RuntimeError("Repeating synthetic intake did not reuse the copy")
+
+        text = temporary_root / "provided-text.txt"
+        content = "Synthetic marker " + token + "; no personal or medical data.\n"
+        text.write_text(content, encoding="utf-8")
+        response = command("health-document", "save-text", "--document", saved_file,
+                           "--config", config, "--profile", identity, "--text-file", text,
+                           "--expected-sha256", expected_hash)
+        sidecar = first / (destination + ".txt")
+        if response.get("review_status") != "unverified" or sidecar.read_text(encoding="utf-8") != content:
+            raise RuntimeError("The synthetic transcript was not preserved as unverified")
+
+        matches = command("health-duplicates", "--config", config, "--profile", identity,
+                          "--source", source)
+        if (not matches.get("coverage", {}).get("search_complete")
+                or destination not in matches.get("matches", [])):
+            raise RuntimeError("The synthetic duplicate was not found in the selected profile")
+        other_matches = command("health-duplicates", "--config", config, "--profile", other,
+                                "--source", source)
+        if not other_matches.get("coverage", {}).get("search_complete") or other_matches.get("matches") != []:
+            raise RuntimeError("Synthetic duplicate search did not respect the profile scope")
+        search = command("health-files", "--config", config, "--profile", identity, input_text=token + "\n")
+        if (not search.get("coverage", {}).get("text_search_complete")
+                or not any(item.get("path") == sidecar.relative_to(first).as_posix()
+                           for item in search.get("matches", []))):
+            raise RuntimeError("The synthetic transcript was not found by local text search")
+        other_search = command("health-files", "--config", config, "--profile", other, input_text=token + "\n")
+        if (not other_search.get("coverage", {}).get("text_search_complete")
+                or other_search.get("matches") != []):
+            raise RuntimeError("Synthetic text search did not respect the profile scope")
+        command("health-document", "copy", "--source", source, "--config", config,
+                "--profile", "unknown_" + token, expect_success=False)
+        if list(second.iterdir()):
+            raise RuntimeError("An unrelated synthetic profile was modified")
+
+        # A different input at the same destination cannot replace the copy.
+        source.write_bytes(b"different synthetic input")
+        conflict = command("health-document", "copy", "--source", source, "--config", config,
+                           "--profile", identity, "--destination", destination, expect_success=False)
+        if conflict.get("error") != "destination_conflict" or saved_file.read_bytes() != content_bytes:
+            raise RuntimeError("The existing synthetic original was changed")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--json", action="store_true", help="Output a machine-readable summary")
+    arguments = parser.parse_args()
+    try:
+        check_local_files()
+    except Exception as error:
+        result = {"status": "failed", "local_file_check": "failed", "error": str(error),
+                  "not_checked": NOT_CHECKED}
+    else:
+        result = {"status": "passed", "local_file_check": "passed", "not_checked": NOT_CHECKED}
+    if arguments.json:
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        print("Synthetic local document/profile check: " + result["local_file_check"])
+        if "error" in result:
+            print("Reason: " + result["error"])
+        print("Not checked:")
+        for limitation in NOT_CHECKED:
+            print("- " + limitation)
+    return 0 if result["status"] == "passed" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
