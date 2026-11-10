@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "health-analyzer-v2-public-research": {
+      "command": "python3",
+      "args": ["-I", "-B", "${CLAUDE_PLUGIN_ROOT}/scripts/launch.py"],
+      "env": {
+        "HEALTH_ANALYZER_V2_CONFIG": "${HEALTH_ANALYZER_V2_CONFIG}",
+        "HEALTH_ANALYZER_V2_CODE_ROOT": "${HEALTH_ANALYZER_V2_CODE_ROOT}"
+      }
+    }
+  }
+}

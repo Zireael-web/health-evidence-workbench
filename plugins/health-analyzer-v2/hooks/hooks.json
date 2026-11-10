@@ -1,0 +1,18 @@
+{
+  "description": "Defense in depth for Health Analyzer v2 public MCP inputs. Review and trust the installed definition before use; this hook is not an anonymity proof and does not cover hosted WebSearch.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^mcp__.*health[-_]analyzer[-_]v2.*public[-_]research__.*$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -B \"${PLUGIN_ROOT}/hooks/public_guard.py\"",
+            "timeout": 5,
+            "statusMessage": "Checking public research input"
+          }
+        ]
+      }
+    ]
+  }
+}

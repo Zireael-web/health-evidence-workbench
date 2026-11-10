@@ -5,6 +5,45 @@ the app's MCP connection is unavailable. It does not read Keychain, `.env`, a
 vault, or the old private state, and it does not change host access restrictions.
 It does not issue a CasePacket, medical verification receipt, or clinical clearance.
 
+## Simple folder workflow with model text
+
+For the ordinary document task, keep a PDF and its complete model-transcribed
+UTF-8 text together in the person's explicitly selected existing folder. A
+selected ChatGPT/Library attachment must first be materialized to its actual
+host path with the current Library tools; the local PDF API cannot download an
+attachment ID. File permissions remain those of the current executor.
+
+1. Copy the selected PDF with `copy_authorized_pdf(source, archive_root)` from
+   `health_analyzer.local_intake`; retain the returned path and SHA-256. This
+   helper does no PDF decoding, OCR, network, database or Keychain work.
+2. Open that preserved PDF in the native file panel. ChatGPT/Codex reads all
+   actual page images, with the existing bounded renderer when available.
+   Respect decoder sandbox failures; no OCR or silent unsandboxed retry.
+3. Write the full model transcription, page separators and explicit doubts to
+   a private UTF-8 staging file. Publish it next to the preserved PDF:
+
+   ```sh
+   /path/to/health-evidence-workbench/.venv/bin/python -I -B /path/to/health-evidence-workbench/scripts/ha-local save-text /selected/person/report.pdf --text-file /private/staging/model-text.txt --expected-sha256 <preserved-pdf-sha256>
+   ```
+
+   The source entry loads code relative to its own location and works outside
+   the repository directory. It uses the existing interpreter without an
+   environment install.
+   This creates `/selected/person/report.txt` without altering the PDF.
+   The PDF hash must still match. UTF-8 whitespace and trailing text are kept
+   byte for byte, up to 8 MiB. An identical retry succeeds unchanged; different
+   existing text is a conflict, never a replacement or new version. No local
+   parser or OCR is invoked by `save-text`; it saves only supplied model text.
+4. Search/read the saved TXT and its matching original using ordinary file
+   tools. Answer in the conversation with current primary sources/guidelines
+   and relevant uncertainty. Public searches receive only a minimal question,
+   never the original report, private paths or identifiers.
+
+The commands are for the assistant, not user setup. The existing typed-record
+pipeline remains optional. This simple path creates no records/history store,
+review receipt, migration or background audit. Saving all supplied text does not
+prove that every page was correctly read; model text remains unverified.
+
 ## One-report workflow
 
 1. A private document agent inspects identity locally and resolves the intended
@@ -31,13 +70,14 @@ uv run health-analyzer local-pdf render /absolute/report.pdf --isolation host --
 
 ## Explicit host mode
 
-The default preserves the nested parser sandbox on macOS. Some managed desktop
-environments cannot start an additional `sandbox-exec` process and return
-`sandbox_apply: Operation not permitted` before reading a PDF. If the user has
-authorized this local fallback, the agent may select `--isolation host` itself.
-There is no need to ask the user to repair MCP or change their app settings.
+The default preserves the nested parser sandbox on macOS. Select `--isolation
+host` in advance only for an expressly authorized standalone operation under
+the caller's existing permissions. Some managed desktop environments cannot
+start an additional `sandbox-exec` process and return `sandbox_apply: Operation
+not permitted` before reading a PDF. Such a denial stops the affected operation;
+do not retry it outside that sandbox or change permissions to make it succeed.
 
-Host mode uses the same bounded PDF worker protocol, CPU/memory/time/input/text
+The separately selected host mode uses the same bounded PDF worker protocol, CPU/memory/time/input/text
 limits and page provenance. It keeps existing host permissions; it does not
 remove a host file-access denial. It makes no network requests. Its Python socket
 guard is defense in depth, **not an OS-enforced network sandbox**. The output
