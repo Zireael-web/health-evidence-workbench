@@ -90,8 +90,8 @@
     },
     {
       "path": "scripts/health-document",
-      "sha256": "6299e4be0ee95cbb7d58579f60b90fff1babe05771dffcb539cbc6ddea2677aa",
-      "size": 8522
+      "sha256": "7d2b26a36edfc8e6320b45b9ee1cac1e5b492902538a7eaea9a75740fe81a9fa",
+      "size": 8890
     },
     {
       "path": "scripts/health-duplicates",
@@ -200,8 +200,8 @@
     },
     {
       "path": "src/health_analyzer/document_files.py",
-      "sha256": "0edf3ac894c4729ba33392f07b34ea38cb50c8230d4918b0137c9a16c4364629",
-      "size": 25795
+      "sha256": "8667fefcbeb763e82b7c7ecd193bef67ac8dc4c2997c7a39286577177fb51611",
+      "size": 37025
     },
     {
       "path": "src/health_analyzer/duplicate_search.py",

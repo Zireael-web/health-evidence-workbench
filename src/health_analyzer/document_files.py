@@ -10,15 +10,19 @@ the helper does not create a provenance manifest.
 """
 from __future__ import annotations
 
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
 import re
+import select
 import secrets
+import signal
 import stat
-from typing import BinaryIO
+import threading
+import time
+from typing import Any, BinaryIO, Callable
 
 from .local_intake import (
     IntakeConflictError,
@@ -38,6 +42,9 @@ MAX_DOCUMENT_BYTES = 64 * 1024 * 1024
 MAX_TEXT_BYTES = 8 * 1024 * 1024
 _CHUNK = 1024 * 1024
 _TEMP_NAME = re.compile(r"\.document-intake-[0-9a-f]{32}\.tmp\Z")
+_TTY_INPUT_TIMEOUT_SECONDS = 120.0
+_TTY_CONFIRM_TIMEOUT_SECONDS = 120.0
+_TTY_LOCK = threading.Lock()
 
 
 class HardlinkReviewRequired(LocalIntakeError):
@@ -345,7 +352,7 @@ def read_supplied_transcript_stream(stream: BinaryIO) -> str:
     supplied text. The stream and its transport are the caller's responsibility;
     this function does not establish their confidentiality or retain a retry copy.
     """
-    chunks: list[bytes] = []
+    content = bytearray()
     remaining = MAX_TEXT_BYTES + 1
     try:
         while remaining:
@@ -354,9 +361,10 @@ def read_supplied_transcript_stream(stream: BinaryIO) -> str:
                 raise LocalIntakeError("Transcript stream must provide UTF-8 bytes.")
             if not chunk:
                 break
-            chunks.append(chunk)
+            if len(chunk) > remaining:
+                raise LocalIntakeError("Transcript stream exceeded its requested read size.")
+            content.extend(chunk)
             remaining -= len(chunk)
-        content = b"".join(chunks)
         if len(content) > MAX_TEXT_BYTES:
             raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
         return content.decode("utf-8")
@@ -364,6 +372,251 @@ def read_supplied_transcript_stream(stream: BinaryIO) -> str:
         raise LocalIntakeError("Transcript input must be valid UTF-8.") from exc
     except OSError as exc:
         raise LocalIntakeError("Transcript stream could not be read.") from exc
+
+
+@contextmanager
+def _tty_process_lock(fd: int):
+    """Lock the actual terminal through a separately opened file description.
+
+    Locking an inherited or duplicated descriptor is insufficient because its
+    open-file description can be shared by different processes. Test the
+    conflict semantics with a second independently opened descriptor before
+    allowing any terminal state changes.
+    """
+    try:
+        import fcntl
+    except ImportError as exc:
+        raise LocalIntakeError("Terminal process locking is unavailable.") from exc
+    required = ("O_NOFOLLOW", "O_NOCTTY", "O_NONBLOCK", "O_CLOEXEC")
+    if not all(hasattr(os, flag) for flag in required):
+        raise LocalIntakeError("Safe terminal process locking is unavailable.")
+    flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NOCTTY | os.O_NONBLOCK | os.O_CLOEXEC
+    lock_fd = None
+    probe_fd = None
+    try:
+        initial = os.fstat(fd)
+        if not stat.S_ISCHR(initial.st_mode) or not os.isatty(fd):
+            raise LocalIntakeError("A terminal input is required.")
+        path = os.ttyname(fd)
+
+        def same_device(other: int) -> bool:
+            current = os.fstat(other)
+            return (stat.S_ISCHR(current.st_mode)
+                    and (current.st_dev, current.st_ino, current.st_rdev)
+                    == (initial.st_dev, initial.st_ino, initial.st_rdev)
+                    and os.isatty(other))
+
+        lock_fd = os.open(path, flags)
+        if not same_device(lock_fd):
+            raise LocalIntakeError("Terminal identity changed before locking.")
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise LocalIntakeError("Another terminal input is active.") from exc
+
+        probe_fd = os.open(path, flags)
+        if not same_device(probe_fd) or not same_device(fd):
+            raise LocalIntakeError("Terminal identity changed during locking.")
+        try:
+            fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            pass
+        else:
+            raise LocalIntakeError("Terminal process locks are not exclusive.")
+        os.close(probe_fd)
+        probe_fd = None
+        yield
+    except LocalIntakeError:
+        raise
+    except (AttributeError, OSError, ValueError) as exc:
+        raise LocalIntakeError("Safe terminal process locking failed.") from exc
+    finally:
+        if probe_fd is not None:
+            os.close(probe_fd)
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+
+def read_supplied_transcript_tty(stream: BinaryIO, announce: Callable[[str], None]) -> str:
+    """Receive a bounded, two-phase UTF-8 transcript from a no-echo terminal.
+
+    After ``READY``, the sender transmits text without EOT (0x04), then EOT.
+    A fresh ``CONFIRM:<nonce>`` follows; the sender must send that exact line
+    plus newline separately. The advisory terminal lock coordinates only
+    cooperating readers; other processes can still change terminal settings.
+    Senders must stop after an error: input arriving after terminal restoration
+    can be echoed. Uncatchable death and unknown transport logging remain
+    outside this function's guarantees.
+    """
+    if not _TTY_LOCK.acquire(blocking=False):
+        raise LocalIntakeError("Terminal input is already active.")
+    try:
+        try:
+            fd = stream.fileno()
+        except (AttributeError, OSError, ValueError) as exc:
+            raise LocalIntakeError("Secure terminal input is unavailable.") from exc
+        with _tty_process_lock(fd):
+            return _read_supplied_transcript_tty_locked(stream, announce)
+    finally:
+        _TTY_LOCK.release()
+
+
+def _read_supplied_transcript_tty_locked(stream: BinaryIO, announce: Callable[[str], None]) -> str:
+    try:
+        import termios
+    except ImportError as exc:
+        raise LocalIntakeError("Secure terminal input is unavailable.") from exc
+    try:
+        if not hasattr(signal, "pthread_sigmask"):
+            raise LocalIntakeError("Safe terminal signal handling is unavailable.")
+        fd = stream.fileno()
+        if not os.isatty(fd):
+            raise LocalIntakeError("A terminal input is required.")
+        original = termios.tcgetattr(fd)
+        original_blocking = os.get_blocking(fd)
+    except (termios.error, AttributeError, OSError, ValueError) as exc:
+        raise LocalIntakeError("Secure terminal input is unavailable.") from exc
+
+    updated = original.copy()
+    updated[6] = original[6][:]
+    input_mask = sum(getattr(termios, name, 0) for name in
+                     ("IGNBRK", "BRKINT", "PARMRK", "ISTRIP", "INLCR", "IGNCR", "ICRNL", "IXON"))
+    local_mask = sum(getattr(termios, name, 0) for name in
+                     ("ECHO", "ECHONL", "ICANON", "ISIG", "IEXTEN"))
+    updated[0] &= ~input_mask
+    updated[3] &= ~local_mask
+    updated[6][termios.VMIN] = 1
+    updated[6][termios.VTIME] = 0
+    handlers: list[tuple[int, Any]] = []
+    terminal_may_be_changed = False
+    blocking_may_be_changed = False
+    wakeup_read: int | None = None
+    wakeup_write: int | None = None
+    previous_wakeup_fd: int | None = None
+    interrupted = False
+
+    def interrupt(_signum: int, _frame: object) -> None:
+        # Never raise from the handler: a second signal must not interrupt the
+        # cleanup that restores terminal settings and process-global handlers.
+        nonlocal interrupted
+        interrupted = True
+
+    def read_until_ready(maximum: int, deadline: float) -> bytes:
+        while True:
+            if interrupted:
+                raise LocalIntakeError("Terminal input was interrupted.")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise LocalIntakeError("Terminal input timed out.")
+            readable, _, _ = select.select([fd, wakeup_read], [], [], remaining)
+            if interrupted or wakeup_read in readable:
+                raise LocalIntakeError("Terminal input was interrupted.")
+            if not readable:
+                raise LocalIntakeError("Terminal input timed out.")
+            try:
+                data = os.read(fd, maximum)
+            except BlockingIOError:
+                continue
+            if not data:
+                raise LocalIntakeError("Terminal input ended early.")
+            return data
+
+    try:
+        wakeup_read, wakeup_write = os.pipe()
+        os.set_blocking(wakeup_read, False)
+        os.set_blocking(wakeup_write, False)
+        for name in ("SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT", "SIGTSTP"):
+            number = getattr(signal, name, None)
+            if number is not None:
+                previous = signal.getsignal(number)
+                handlers.append((number, previous))
+                signal.signal(number, interrupt)
+        previous_wakeup_fd = signal.set_wakeup_fd(wakeup_write, warn_on_full_buffer=False)
+        if interrupted:
+            raise LocalIntakeError("Terminal input was interrupted.")
+        # Calls can fail after partially changing state; always attempt rollback.
+        terminal_may_be_changed = True
+        termios.tcsetattr(fd, termios.TCSAFLUSH, updated)
+        blocking_may_be_changed = True
+        os.set_blocking(fd, False)
+        actual = termios.tcgetattr(fd)
+        if (actual[0] & input_mask or actual[3] & local_mask
+                or actual[6][termios.VMIN] != 1 or actual[6][termios.VTIME] != 0
+                or os.get_blocking(fd)):
+            raise LocalIntakeError("Terminal could not disable echo or input transformations.")
+
+        if interrupted:
+            raise LocalIntakeError("Terminal input was interrupted.")
+        announce("READY")
+        content = bytearray()
+        deadline = time.monotonic() + _TTY_INPUT_TIMEOUT_SECONDS
+        while True:
+            chunk = read_until_ready(min(_CHUNK, MAX_TEXT_BYTES + 1 - len(content)), deadline)
+            marker = chunk.find(b"\x04")
+            if marker >= 0:
+                if chunk[marker + 1:]:
+                    raise LocalIntakeError("Unexpected data followed the transcript terminator.")
+                content.extend(chunk[:marker])
+                break
+            content.extend(chunk)
+            if len(content) > MAX_TEXT_BYTES:
+                raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
+        if len(content) > MAX_TEXT_BYTES:
+            raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise LocalIntakeError("Transcript input must be valid UTF-8.") from exc
+
+        confirmation = "CONFIRM:" + secrets.token_hex(16)
+        announce(confirmation)
+        expected = (confirmation + "\n").encode("ascii")
+        received = bytearray()
+        deadline = time.monotonic() + _TTY_CONFIRM_TIMEOUT_SECONDS
+        while len(received) < len(expected):
+            received.extend(read_until_ready(len(expected) - len(received), deadline))
+            if not expected.startswith(received):
+                raise LocalIntakeError("Terminal confirmation did not match.")
+        return text
+    except LocalIntakeError:
+        raise
+    except (termios.error, OSError, ValueError, RuntimeError) as exc:
+        raise LocalIntakeError("Secure terminal input failed.") from exc
+    finally:
+        try:
+            previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {n for n, _ in handlers})
+            try:
+                try:
+                    if terminal_may_be_changed:
+                        try:
+                            termios.tcflush(fd, termios.TCIFLUSH)
+                        finally:
+                            termios.tcsetattr(fd, termios.TCSAFLUSH, original)
+                finally:
+                    if blocking_may_be_changed:
+                        os.set_blocking(fd, original_blocking)
+            finally:
+                try:
+                    try:
+                        if previous_wakeup_fd is not None:
+                            signal.set_wakeup_fd(previous_wakeup_fd)
+                        for number, previous in reversed(handlers):
+                            signal.signal(number, previous)
+                    finally:
+                        try:
+                            if wakeup_read is not None:
+                                os.close(wakeup_read)
+                        finally:
+                            if wakeup_write is not None:
+                                os.close(wakeup_write)
+                finally:
+                    signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            if interrupted:
+                raise LocalIntakeError("Terminal input was interrupted.")
+        except LocalIntakeError:
+            raise
+        except (termios.error, OSError, ValueError, RuntimeError) as exc:
+            raise LocalIntakeError("Terminal state could not be restored safely.") from exc
 
 
 def inspect_pending_publication(archive_root: Path, relative_destination: str, *,
