@@ -74,6 +74,11 @@
       "size": 3367
     },
     {
+      "path": "scripts/check-simple-setup",
+      "sha256": "4bdb4b55a0aacf99509ac1d57ec21b7ae36c412e9b152ae3f013086c461355a6",
+      "size": 9112
+    },
+    {
       "path": "scripts/ha-local",
       "sha256": "6b5d5b2b95cbdb576f66dae76830946a43d36835682d86bb20e65e9a58efa49d",
       "size": 277
@@ -82,6 +87,26 @@
       "path": "scripts/ha-v2",
       "sha256": "8a0ffd113c01a9a119a42f1368a1823b5a9ad26e4ef3d290a1644fcdcf32980a",
       "size": 280
+    },
+    {
+      "path": "scripts/health-document",
+      "sha256": "266da3125a7532ad3e2db98d9327324c8064d38329d09c3c439dab618bb8cf9b",
+      "size": 8026
+    },
+    {
+      "path": "scripts/health-duplicates",
+      "sha256": "3f417378ad193731c2c2d2016f3bae1c3b4a214d74e37363569245167c64bda7",
+      "size": 1680
+    },
+    {
+      "path": "scripts/health-files",
+      "sha256": "268ed95a189d40593625f2de1e2321343857329eb805b6e0eeffd88ae5fa3449",
+      "size": 2966
+    },
+    {
+      "path": "scripts/prepare-v2-install",
+      "sha256": "dda45d4405cc36344fe57175bc52e3b47499f416b5eaf22d882c287b2d3aa30b",
+      "size": 13208
     },
     {
       "path": "scripts/render-sandbox-profile",
@@ -139,36 +164,6 @@
       "size": 76
     },
     {
-      "path": "src/health_analyzer/cards/__init__.py",
-      "sha256": "7579f79002ee8e5f730cbca0d607a37f1ef2ac1cce55be2a20df535ed4738ab3",
-      "size": 81
-    },
-    {
-      "path": "src/health_analyzer/cards/decision.py",
-      "sha256": "cc1fea394f94f99d306cef1705e142a72a8fce23ecaa7903861c3864dc09b337",
-      "size": 15843
-    },
-    {
-      "path": "src/health_analyzer/cards/demo.py",
-      "sha256": "0cfd2cdaea95ce25b5d26077fe5669e9c9d1b5ef960142708a80aa596d49227d",
-      "size": 6116
-    },
-    {
-      "path": "src/health_analyzer/cards/patient.py",
-      "sha256": "d384325ee243e9a610586e1746744fb3f598e957d0eb13875719b2933a0214c4",
-      "size": 4923
-    },
-    {
-      "path": "src/health_analyzer/cards/rendering.py",
-      "sha256": "5041975c27ef5227826f63b6e7df80cfc06da390cd2d96bf16e12166e941f4bf",
-      "size": 35024
-    },
-    {
-      "path": "src/health_analyzer/cards/validation.py",
-      "sha256": "2500e9b56f288d74c665cc97a27da2090743086b94e41b877d66af360f38579f",
-      "size": 3669
-    },
-    {
       "path": "src/health_analyzer/claims/__init__.py",
       "sha256": "21d402f3f8c759b854109ec85070490d9d2ba4d6327d17782d63a02250b496aa",
       "size": 191
@@ -180,8 +175,8 @@
     },
     {
       "path": "src/health_analyzer/cli.py",
-      "sha256": "d98254f76fdc74d64752dc17dc45813dacff25a88c55e87b0acd7d96e48c54f9",
-      "size": 11958
+      "sha256": "a3ee805afaae2c1eb9771935b4b0ea6a39f50962126bdd8151ed6a7bc2162646",
+      "size": 10767
     },
     {
       "path": "src/health_analyzer/contracts.py",
@@ -202,6 +197,16 @@
       "path": "src/health_analyzer/diagnostics.py",
       "sha256": "0680f88562e664086aadef8e5b45a5d5d672b88b26578886de061b40c58644ac",
       "size": 5627
+    },
+    {
+      "path": "src/health_analyzer/document_files.py",
+      "sha256": "40817aa4e9f696f506fd8f55a4959d7ba43af3dcf45a14b752f654283fcb87bb",
+      "size": 24549
+    },
+    {
+      "path": "src/health_analyzer/duplicate_search.py",
+      "sha256": "1601faa57f57311cc544863fc4743c699725c206c3ddd6b2051995e7a4d5e33d",
+      "size": 11136
     },
     {
       "path": "src/health_analyzer/evidence/__init__.py",
@@ -237,6 +242,11 @@
       "path": "src/health_analyzer/evidence/store.py",
       "sha256": "278c60da66d3aa6f8bb861f487bad6f6c7e21d1af08cad77abc10498dee8ee18",
       "size": 17404
+    },
+    {
+      "path": "src/health_analyzer/file_archive.py",
+      "sha256": "fc7dc5480f5580e23575d2f41dd8668693482292f652dac0664603e4adeb5bf7",
+      "size": 18867
     },
     {
       "path": "src/health_analyzer/guidance/__init__.py",
@@ -395,8 +405,8 @@
     },
     {
       "path": "src/health_analyzer/mcp_server.py",
-      "sha256": "e4708de11f816d9fe64fdb1e1d97495f2761ada43110be6c997c80ce098153a9",
-      "size": 153557
+      "sha256": "6bcfffa6ea662949e9b1f126b960f41e88e843a0a2df63415647e6a947e9ab55",
+      "size": 149369
     },
     {
       "path": "src/health_analyzer/packets.py",
@@ -410,8 +420,8 @@
     },
     {
       "path": "src/health_analyzer/privacy/egress.py",
-      "sha256": "fc9c79ee0a197644d120c512aacd0e876df76aa6c714792586e5af93ada4fa13",
-      "size": 34305
+      "sha256": "4f2b975f780a33b3a0e9f82bc6cb975658f05f98b4de8df421a715e7b50b214c",
+      "size": 34416
     },
     {
       "path": "src/health_analyzer/privacy/gate.py",
@@ -542,11 +552,6 @@
       "path": "src/health_analyzer/v2/pdf_worker.py",
       "sha256": "bedf2979ba3623be83e6389879ece475b47c2193df3ead9aa7e20aa9eacfe7eb",
       "size": 364
-    },
-    {
-      "path": "src/health_analyzer/v2/preview.py",
-      "sha256": "f4a45b8a13adc61a217a3a8aa668ab0bdd28c599d46341244cacc7a009584f13",
-      "size": 63176
     },
     {
       "path": "src/health_analyzer/v2/private_answers.py",

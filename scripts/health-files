@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Private, read-only text search with an explicit config and profile.
+
+Query text is read from stdin or a file, never from command-line arguments.
+Do not send this program's output to a public service; it may contain health data.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from health_analyzer.file_archive import (ArchiveError, _absolute_path, _open_dir,
+                                          _read_bounded, load_profiles, search_text)
+
+MAX_QUERY_BYTES = 4096
+
+
+class UsageError(ValueError):
+    pass
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise UsageError(message)
+
+
+def _query_from_file(value: str) -> bytes:
+    path = _absolute_path(value)
+    parent = _open_dir(path.parent)
+    try:
+        return _read_bounded(parent, path.name, MAX_QUERY_BYTES)
+    finally:
+        os.close(parent)
+
+
+def main() -> int:
+    parser = Parser(description="Search one selected private profile's UTF-8 text files.")
+    parser.add_argument("--config", required=True, help="Existing private JSON profile config")
+    parser.add_argument("--profile", required=True, help="Explicit configured profile ID or label")
+    parser.add_argument("--query-file", help="Existing private UTF-8 query file; defaults to stdin")
+    parser.add_argument("--max-matches", type=int, default=25, help="Maximum returned matches (1–100)")
+    try:
+        args = parser.parse_args()
+        if args.query_file:
+            raw = _query_from_file(args.query_file)
+        else:
+            raw = sys.stdin.buffer.read(MAX_QUERY_BYTES + 1)
+        if len(raw) > MAX_QUERY_BYTES:
+            raise ArchiveError("Query exceeds the input byte limit.")
+        query = raw.decode("utf-8").rstrip("\r\n")
+        profiles = load_profiles(args.config)
+        result = search_text(profiles, args.profile, query, max_matches=args.max_matches)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    except (ArchiveError, UsageError, OSError, UnicodeError, ValueError) as exc:
+        # Avoid echoing untrusted query text, file paths, or personal data.
+        if isinstance(exc, UsageError):
+            kind, message = "invalid_arguments", "Provide --config, --profile and optional --query-file; query text belongs in stdin or a file."
+        elif isinstance(exc, ArchiveError):
+            kind, message = "search_unavailable", str(exc)
+        elif isinstance(exc, UnicodeError):
+            kind, message = "search_unavailable", "The query must be valid UTF-8."
+        else:
+            kind, message = "search_unavailable", "A path is inaccessible, unsafe, or contains a symbolic link."
+        print(json.dumps({"error": kind, "message": message}), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

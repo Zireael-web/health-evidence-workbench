@@ -1,11 +1,11 @@
 """Local-only construction of previewable, minimized case payloads.
 
-The outbound packet deliberately has no source identifiers, provenance, source
-digests, local paths, or exact calendar dates.  Every invocation creates fresh
-packet-local identifiers, so two requests cannot be linked through identifiers
-created by this module.  These deterministic redaction rules reduce disclosure;
-they do not guarantee anonymity or eliminate re-identification risk from a rare
-combination of clinical facts.
+The outbound packet omits certain structured source identifiers, provenance,
+source digests and exact dates, and redacts recognizable text patterns. Every
+invocation creates fresh packet-local identifiers, so two requests cannot be
+linked through identifiers created by this module. These deterministic rules
+may miss identifying text; they do not guarantee anonymity or eliminate
+re-identification risk from clinical facts.
 
 This module performs no network I/O.  Building a packet is not authorization to
 send it: callers must show ``EgressCasePacket.payload`` (or the canonical JSON)
@@ -39,10 +39,11 @@ EGRESS_SCHEMA_VERSION = "1.0"
 MAX_EGRESS_RECORDS = 100
 MAX_EGRESS_PAYLOAD_BYTES = 8 * 1024 * 1024
 DEIDENTIFICATION_NOTICE = (
-    "Direct identifiers, exact calendar dates, named facilities, locations, "
-    "local provenance, and internal identifiers were removed by local rules. "
-    "This reduces disclosure but does not guarantee anonymity or prevent "
-    "re-identification from clinical details."
+    "Certain structured source identifiers, provenance, digests and dates are "
+    "omitted, and recognizable patterns are redacted by local rules. Names, "
+    "locations and other identifiers may remain in free text. A human must "
+    "review the exact payload before any external sharing. These rules do not "
+    "guarantee anonymity or prevent re-identification from clinical details."
 )
 
 _SOURCE_PACKET_ID = re.compile(r"case_[a-f0-9]{20,64}\Z")

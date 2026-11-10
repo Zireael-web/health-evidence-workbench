@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Prepare and check an inactive v2 plugin bundle in a new output directory.
+
+This creates files only in a new output directory. It does not install a plugin,
+modify Codex configuration, access medical archives, or execute a PubMed search.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import queue
+import secrets
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+
+ROOT = Path(__file__).resolve().parents[1]
+PLUGIN = ROOT / "plugins" / "health-analyzer-v2"
+ENTRY = ROOT / "src" / "health_analyzer" / "v2" / "entry.py"
+TIMEOUT = 45
+
+
+class PreparationError(Exception):
+    pass
+
+
+def run(command: list[str], *, input_text: str | None = None) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(command, input=input_text, capture_output=True, text=True,
+                              timeout=TIMEOUT, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise PreparationError("Unable to execute the selected interpreter or runtime") from error
+
+
+def preflight_python(python: Path) -> None:
+    if not python.is_file() or not os.access(python, os.X_OK):
+        raise PreparationError("Selected Python executable is missing or not executable")
+    probe = ("import sys,importlib.metadata; from mcp.server import MCPServer; "
+             "assert sys.version_info >= (3,11); "
+             "assert importlib.metadata.version('mcp').split('.')[0] == '2'")
+    result = run([str(python), "-I", "-B", "-c", probe])
+    if result.returncode:
+        raise PreparationError("Selected Python needs Python 3.11+ and the MCP 2 extra; install dependencies first")
+
+
+def validate_output(value: str) -> Path:
+    target = Path(os.path.abspath(os.path.expanduser(value)))
+    if target.exists() or target.is_symlink():
+        raise PreparationError("Output must be a new, non-existent directory")
+    if not target.parent.is_dir():
+        raise PreparationError("Output parent directory must already exist")
+    if any(path.is_symlink() for path in (target.parent, *target.parent.parents)):
+        raise PreparationError("Output path cannot traverse symlinks; choose its real parent path")
+    if target == ROOT or ROOT in target.parents or target in ROOT.parents:
+        raise PreparationError("Output must be outside the source checkout")
+    return target
+
+
+def stdio_check(command: list[str]) -> None:
+    # Request/response sequencing matters: closing stdin after writing all
+    # messages can race the asynchronous server before tools/list is handled.
+    messages: queue.Queue = queue.Queue()
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=subprocess.DEVNULL, text=True, bufsize=1,
+                                   start_new_session=True)
+    except OSError as error:
+        raise PreparationError("Public MCP could not be started") from error
+
+    def read_messages() -> None:
+        for line in process.stdout:
+            messages.put(line)
+        messages.put(None)
+
+    def send(message: dict) -> None:
+        process.stdin.write(json.dumps(message) + "\n")
+        process.stdin.flush()
+
+    def response(request_id: int) -> dict:
+        while True:
+            line = messages.get(timeout=TIMEOUT)
+            if line is None:
+                raise PreparationError("Public MCP exited before responding")
+            item = json.loads(line)
+            if item.get("id") == request_id:
+                return item["result"]
+
+    threading.Thread(target=read_messages, daemon=True).start()
+    try:
+        send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2025-11-25", "capabilities": {},
+            "clientInfo": {"name": "synthetic-setup-check", "version": "1"}}})
+        initialized = response(1)
+        send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+        send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+        tools = response(2)["tools"]
+        names = {tool["name"] for tool in tools}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, queue.Empty) as error:
+        raise PreparationError("Public MCP returned an invalid initialization response") from error
+    finally:
+        try:
+            process.stdin.close()
+            process.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
+        process.stdout.close()
+    if process.returncode:
+        raise PreparationError("Public MCP exited with an error after the synthetic exchange")
+    if ("public-research" not in initialized.get("serverInfo", {}).get("name", "")
+            or not {"plan_search", "execute_search", "review_answer"} <= names
+            or "query_history" in names):
+        raise PreparationError("Public MCP did not expose the expected public-only tools")
+
+
+def check_guard(python: Path, guard: Path) -> None:
+    event = {"hook_event_name": "PreToolUse",
+             "tool_name": "mcp__health-analyzer-v2-public-research__plan_search",
+             "tool_input": {"subject_id": "synthetic-test-id"}}
+    result = run([str(python), "-I", "-B", str(guard)], input_text=json.dumps(event))
+    try:
+        decision = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
+    except (ValueError, KeyError, TypeError) as error:
+        raise PreparationError("Synthetic hook guard check returned an invalid response") from error
+    if result.returncode or decision != "deny":
+        raise PreparationError("Synthetic hook guard check did not deny the private field")
+
+
+def write_json(path: Path, value: dict) -> None:
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
+
+
+def prepare(output: Path, python: Path, isolation: str) -> dict:
+    if not ENTRY.is_file() or not (PLUGIN / ".codex-plugin" / "plugin.json").is_file():
+        raise PreparationError("Source checkout is missing the v2 runtime or plugin")
+    if any(path.is_symlink() for path in PLUGIN.rglob("*")):
+        raise PreparationError("Plugin source contains symlinks; inspect it before preparation")
+    preflight_python(python)
+    try:
+        output.mkdir(mode=0o700)
+    except FileExistsError as error:
+        raise PreparationError("Output appeared during preparation; no existing directory is used") from error
+
+    config = output / "deployment.json"
+    runtime = [str(python), "-I", "-B", str(ENTRY), "--config", str(config)]
+    initialization = run(runtime + ["init", "--data-root", str(output / "data"),
+                                   "--isolation", isolation, "--research-provider", "pubmed"])
+    if initialization.returncode:
+        raise PreparationError("Could not initialize the new v2 namespace; inspect the incomplete output directory")
+    try:
+        initialized = json.loads(initialization.stdout)
+        stored_config = json.loads(config.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise PreparationError("The new configuration could not be verified") from error
+    if (initialized.get("status") != "initialized" or stored_config.get("archive_roots")
+            or stored_config.get("research_provider") != {"name": "pubmed"}):
+        raise PreparationError("New configuration did not match public research and empty archive bindings")
+
+    doctor = run(runtime + ["doctor"])
+    try:
+        doctor_status = json.loads(doctor.stdout).get("status")
+    except ValueError as error:
+        raise PreparationError("Doctor did not return a valid report") from error
+    expected = "logical_host_only" if isolation == "host" else "partial"
+    if doctor_status != expected:
+        raise PreparationError("The chosen isolation mode did not pass its available synthetic doctor checks")
+    command = runtime + ["serve", "--zone", "public-research", "--transport", "stdio"]
+
+    marketplace = output / "marketplace"
+    plugin_copy = marketplace / "plugins" / "health-analyzer-v2"
+    plugin_copy.parent.mkdir(parents=True, mode=0o700)
+    shutil.copytree(PLUGIN, plugin_copy, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store", "*.pyc"))
+    # This local-only locator travels with the prepared plugin copy. No personal
+    # path is written to the source tree or to a public repository. Codex cache
+    # propagation must still be verified by the user after actual installation.
+    local_locator = {"schema": "health-analyzer.local-install/1", "source_root": str(ROOT),
+                     "python": str(python), "configuration": str(config)}
+    write_json(plugin_copy / ".local-install.json", local_locator)
+    mcp = {"mcpServers": {"health-analyzer-v2-public-research": {
+        "command": str(python), "args": command[1:]}}}
+    # Replacing the template is confined to this newly created plugin copy.
+    (plugin_copy / ".mcp.json").write_text(json.dumps(mcp, indent=2) + "\n", encoding="utf-8")
+    try:
+        generated = json.loads((plugin_copy / ".mcp.json").read_text(encoding="utf-8"))
+        server = generated["mcpServers"]["health-analyzer-v2-public-research"]
+        stdio_check([server["command"], *server["args"]])
+    except (KeyError, TypeError, ValueError) as error:
+        raise PreparationError("Generated MCP registration is invalid") from error
+    check_guard(python, plugin_copy / "hooks" / "public_guard.py")
+
+    market_name = "health-workbench-" + secrets.token_hex(4)
+    catalog = {"name": market_name, "interface": {"displayName": "Health Workbench (prepared)"},
+               "plugins": [{"name": "health-analyzer-v2",
+                            "source": {"source": "local", "path": "./plugins/health-analyzer-v2"},
+                            "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+                            "category": "Research"}]}
+    catalog_path = marketplace / ".agents" / "plugins" / "marketplace.json"
+    catalog_path.parent.mkdir(parents=True, mode=0o700)
+    write_json(catalog_path, catalog)
+    commands = [f"codex plugin marketplace add {shlex.quote(str(marketplace))} --json",
+                f"codex plugin add {shlex.quote('health-analyzer-v2@' + market_name)} --json"]
+    summary = {
+        "status": "prepared_inactive", "marketplace": str(marketplace), "configuration": str(config),
+        "interpreter": str(python), "isolation": isolation, "doctor_status": doctor_status,
+        "public_research_provider": "pubmed_configured_not_searched", "archive_bindings": "none",
+        "checks": ["configuration_initialized", "synthetic_doctor", "public_mcp_stdio_tools",
+                   "synthetic_hook_code_denial"],
+        "not_checked": ["actual Codex installation", "installed hook trust and enablement",
+                        "installed cache retains the local locator", "hook denial in Codex",
+                        "PubMed network access", "visual reading",
+                        "patient archive access", "medical accuracy",
+                        "concurrent hostile replacement of output paths"],
+        "commands_not_executed": commands,
+        "important": ["Output depends on this source checkout and interpreter; do not move or remove them.",
+                      "Review and trust the installed hook, run its synthetic denial canary, and test in a new chat.",
+                      "Use a trusted output parent; path checks are not a defense against concurrent hostile replacement.",
+                      "host mode does not enforce filesystem or network separation." if isolation == "host"
+                      else "Doctor covers only synthetic boundaries; deployment readiness is not established."],
+    }
+    write_json(output / "preparation-summary.json", summary)
+    return summary
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", required=True, help="New directory outside the source checkout")
+    parser.add_argument("--python", default=sys.executable,
+                        help="Python 3.11+ executable with MCP 2 installed (default: current Python)")
+    parser.add_argument("--isolation", required=True, choices=("host", "macos_enforced"),
+                        help="Explicit runtime isolation; host does not enforce OS boundaries")
+    arguments = parser.parse_args()
+    try:
+        output = validate_output(arguments.output)
+        python = Path(os.path.abspath(os.path.expanduser(arguments.python)))
+        report = prepare(output, python, arguments.isolation)
+    except (PreparationError, OSError, ValueError) as error:
+        print(json.dumps({"status": "failed", "error": str(error),
+                          "note": "No Codex installation was changed; inspect any incomplete new output."}), file=sys.stderr)
+        return 1
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

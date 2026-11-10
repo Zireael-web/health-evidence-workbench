@@ -79,8 +79,6 @@ AGENT_TOOLSETS = {
         "route_science_question",
         "load_synthesis_packets",
         "audit_answer_bundle",
-        "get_patient_card",
-        "build_decision_card",
     },
     "audit-review": {"load_audit_evidence_packet", "audit_public_claims"},
 }
