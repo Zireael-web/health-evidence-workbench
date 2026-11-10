@@ -21,7 +21,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from health_analyzer.document_files import (HardlinkReviewRequired, copy_authorized_document, ensure_folder,
-    inspect_pending_publication, read_supplied_transcript, save_document_transcript)
+    inspect_pending_publication, read_supplied_transcript, read_supplied_transcript_stream,
+    save_document_transcript)
 from health_analyzer.file_archive import ArchiveError, load_profiles, select_profile
 from health_analyzer.local_intake import (IntakeConflictError, LocalIntakeError,
                                           _directory, _regular_file, _snapshot)
@@ -55,7 +56,9 @@ def parser() -> Parser:
     text = operations.add_parser("save-text", help="Save supplied text beside the selected original")
     text.add_argument("--document", required=True, type=absolute_path)
     add_profile_options(text)
-    text.add_argument("--text-file", required=True, type=absolute_path)
+    text_input = text.add_mutually_exclusive_group(required=True)
+    text_input.add_argument("--text-file", type=absolute_path, help="Read an existing UTF-8 file; never delete it")
+    text_input.add_argument("--text-stdin", action="store_true", help="Read bounded UTF-8 text from standard input")
     text.add_argument("--expected-sha256", required=True, help="Hash of the preserved original")
     inspect = operations.add_parser("inspect-pending", help="Read-only inspection of an interrupted publication")
     add_profile_options(inspect)
@@ -106,8 +109,12 @@ def main() -> int:
             )
             extra = {"identity_assignment": "explicit_profile" if chosen else "caller_selected_archive_root"}
         elif args.operation == "save-text":
+            if args.text_stdin and sys.stdin.isatty():
+                raise InvalidArguments
+            transcript = (read_supplied_transcript_stream(sys.stdin.buffer) if args.text_stdin
+                          else read_supplied_transcript(args.text_file))
             saved = save_document_transcript(
-                args.document, read_supplied_transcript(args.text_file),
+                args.document, transcript,
                 archive_root=root, expected_sha256=args.expected_sha256, expected_root_identity=expected_root,
             )
             extra = {"method": "caller_supplied_text", "review_status": "unverified"}

@@ -226,7 +226,7 @@ MCP; приватный runtime настраивается отдельно и �
 ```bash
 scripts/update-runtime-manifest
 scripts/run-public-mcp --expected-runtime-manifest-sha256 \
-  67a9a1613fa6bc28d72bbbd096437d4838eda15c4387987a150a16dec85d8915
+  a56986aa620dbdebbfcf76c8108448bd0a42caa3da025c3adf46ae786ecf155d
 ```
 
 Не запускайте эти команды как замену настройке v2. В зависимости от окружения

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 from pathlib import Path
 import runpy
@@ -15,10 +16,10 @@ import pytest
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "health-document"
 
 
-def invoke(*args: object) -> subprocess.CompletedProcess[str]:
+def invoke(*args: object, stdin_text: str | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "-I", "-B", str(SCRIPT), *(str(arg) for arg in args)],
-        text=True, encoding="utf-8", capture_output=True, check=False,
+        input=stdin_text, text=True, encoding="utf-8", capture_output=True, check=False,
     )
 
 
@@ -52,6 +53,116 @@ def test_copy_then_save_supplied_text_in_selected_profile(tmp_path: Path) -> Non
     assert Path(result["path"]).read_text(encoding="utf-8") == "Вымышленный отчёт\n"
     assert list(second.iterdir()) == []
     assert "Вымышленный отчёт" not in saved.stdout
+    assert transcript.read_text(encoding="utf-8") == "Вымышленный отчёт\n"
+
+
+def test_stdin_saves_without_staging_or_echo_and_can_retry(tmp_path: Path) -> None:
+    base = tmp_path.resolve()
+    archive = base / "archive"
+    archive.mkdir()
+    document = archive / "invented.scan"
+    document.write_bytes(b"fictional document")
+    unrelated = base / "unrelated.txt"
+    unrelated.write_text("preserve caller file", encoding="utf-8")
+    digest = hashlib.sha256(document.read_bytes()).hexdigest()
+    content = "Синтетический текст\r\nПустая строка\n"
+    args = ("save-text", "--document", document, "--archive-root", archive,
+            "--text-stdin", "--expected-sha256", digest)
+
+    first = invoke(*args, stdin_text=content)
+    assert first.returncode == 0 and json.loads(first.stdout)["status"] == "copied"
+    assert (archive / "invented.scan.txt").read_bytes() == content.encode("utf-8")
+    assert content not in first.stdout + first.stderr
+    assert sorted(p.name for p in base.iterdir()) == ["archive", "unrelated.txt"]
+    assert sorted(p.name for p in archive.iterdir()) == ["invented.scan", "invented.scan.txt"]
+    assert unrelated.read_text(encoding="utf-8") == "preserve caller file"
+
+    retry = invoke(*args, stdin_text=content)
+    assert retry.returncode == 0 and json.loads(retry.stdout)["status"] == "already_present"
+    conflict = invoke(*args, stdin_text="different supplied text")
+    assert conflict.returncode == 1
+    assert json.loads(conflict.stdout)["error"] == "destination_conflict"
+    assert (archive / "invented.scan.txt").read_bytes() == content.encode("utf-8")
+    assert unrelated.read_text(encoding="utf-8") == "preserve caller file"
+
+
+@pytest.mark.parametrize("payload", [pytest.param(b"\xff", id="invalid-utf8"),
+                                     pytest.param(b"x" * (8 * 1024 * 1024 + 1), id="oversize")])
+def test_stdin_invalid_or_oversize_fails_without_writes_or_echo(tmp_path: Path, payload: bytes) -> None:
+    archive = tmp_path.resolve() / "archive"
+    archive.mkdir()
+    document = archive / "invented.bin"
+    document.write_bytes(b"fictional")
+    command = [sys.executable, "-I", "-B", str(SCRIPT), "save-text", "--document", str(document),
+               "--archive-root", str(archive), "--text-stdin", "--expected-sha256",
+               hashlib.sha256(document.read_bytes()).hexdigest()]
+    result = subprocess.run(command, input=payload, capture_output=True, check=False)
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["error"] == "operation_failed"
+    assert not result.stderr
+    assert payload[:32] not in result.stdout
+    assert sorted(p.name for p in archive.iterdir()) == ["invented.bin"]
+
+
+def test_stdin_wrong_hash_and_symlink_never_touch_user_files(tmp_path: Path) -> None:
+    base = tmp_path.resolve()
+    archive = base / "archive"
+    archive.mkdir()
+    document = archive / "invented.bin"
+    document.write_bytes(b"fictional")
+    unrelated = base / "unrelated.txt"
+    unrelated.write_text("preserve caller file", encoding="utf-8")
+    args = ("save-text", "--document", document, "--archive-root", archive, "--text-stdin")
+    failed = invoke(*args, "--expected-sha256", "0" * 64, stdin_text="fictional text")
+    assert failed.returncode == 1 and json.loads(failed.stdout)["error"] == "operation_failed"
+    assert not (archive / "invented.bin.txt").exists()
+    (archive / "invented.bin.txt").symlink_to(unrelated)
+    blocked = invoke(*args, "--expected-sha256", hashlib.sha256(b"fictional").hexdigest(),
+                     stdin_text="fictional text")
+    assert blocked.returncode == 1
+    assert unrelated.read_text(encoding="utf-8") == "preserve caller file"
+    assert (archive / "invented.bin.txt").is_symlink()
+    assert document.read_bytes() == b"fictional"
+
+
+def test_stdin_rejects_tty_without_reading_or_writing(tmp_path: Path, monkeypatch, capsys) -> None:
+    archive = tmp_path.resolve() / "archive"
+    archive.mkdir()
+    document = archive / "invented.bin"
+    document.write_bytes(b"fictional")
+    namespace = runpy.run_path(str(SCRIPT))
+    entry = namespace["main"]
+
+    class SyntheticTTY(io.TextIOWrapper):
+        def isatty(self) -> bool:
+            return True
+
+    tty = SyntheticTTY(io.BytesIO(b"fictional text"), encoding="utf-8")
+    monkeypatch.setattr(sys, "stdin", tty)
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "save-text", "--document", str(document),
+        "--archive-root", str(archive), "--text-stdin", "--expected-sha256", "0" * 64])
+    assert entry() == 2
+    assert json.loads(capsys.readouterr().out) == {"error": "invalid_arguments"}
+    assert tty.buffer.tell() == 0
+    assert sorted(p.name for p in archive.iterdir()) == ["invented.bin"]
+
+
+def test_file_input_is_never_removed_after_save_or_conflict(tmp_path: Path) -> None:
+    base = tmp_path.resolve()
+    archive = base / "archive"
+    archive.mkdir()
+    document = archive / "invented.bin"
+    document.write_bytes(b"fictional")
+    user_file = base / "caller-supplied.txt"
+    user_file.write_text("original input", encoding="utf-8")
+    args = ("save-text", "--document", document, "--archive-root", archive,
+            "--text-file", user_file, "--expected-sha256", hashlib.sha256(b"fictional").hexdigest())
+    assert invoke(*args).returncode == 0
+    assert user_file.read_text(encoding="utf-8") == "original input"
+    user_file.write_text("different input", encoding="utf-8")
+    assert invoke(*args).returncode == 1
+    assert user_file.read_text(encoding="utf-8") == "different input"
+    assert (archive / "invented.bin.txt").read_text(encoding="utf-8") == "original input"
 
 
 @pytest.mark.parametrize("extra", [[], ["--document", "/private-sensitive-name"]])

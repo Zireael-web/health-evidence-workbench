@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import secrets
 import stat
+from typing import BinaryIO
 
 from .local_intake import (
     IntakeConflictError,
@@ -335,6 +336,34 @@ def read_supplied_transcript(path: Path) -> str:
         raise LocalIntakeError("Transcript input must be valid UTF-8.") from exc
     except OSError as exc:
         raise LocalIntakeError("Transcript paths must exist and allow secure access.") from exc
+
+
+def read_supplied_transcript_stream(stream: BinaryIO) -> str:
+    """Read bounded UTF-8 input without creating or deleting a staging file.
+
+    The caller must provide a binary stream and close its writing end after the
+    supplied text. The stream and its transport are the caller's responsibility;
+    this function does not establish their confidentiality or retain a retry copy.
+    """
+    chunks: list[bytes] = []
+    remaining = MAX_TEXT_BYTES + 1
+    try:
+        while remaining:
+            chunk = stream.read(min(_CHUNK, remaining))
+            if not isinstance(chunk, bytes):
+                raise LocalIntakeError("Transcript stream must provide UTF-8 bytes.")
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        content = b"".join(chunks)
+        if len(content) > MAX_TEXT_BYTES:
+            raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise LocalIntakeError("Transcript input must be valid UTF-8.") from exc
+    except OSError as exc:
+        raise LocalIntakeError("Transcript stream could not be read.") from exc
 
 
 def inspect_pending_publication(archive_root: Path, relative_destination: str, *,
