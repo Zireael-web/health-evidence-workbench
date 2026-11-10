@@ -49,6 +49,56 @@ def test_symlink_output_is_never_followed(tmp_path):
     assert list(target.iterdir()) == []
 
 
+def test_invalid_private_profiles_are_rejected_before_output_is_created(tmp_path):
+    base = tmp_path.resolve()
+    output = base / "not-created"
+    config = base / "private-profiles.json"
+    config.write_text('{"profiles":[{"id":"p","label":"Example","root":"/nonexistent-profile-root"}]}')
+    result = invoke(output, "--profiles-config", str(config))
+    assert result.returncode != 0 and not output.exists()
+    assert str(config) not in result.stderr
+    assert "nonexistent-profile-root" not in result.stderr
+
+
+def test_profile_config_symlink_and_overlapping_roots_are_rejected(tmp_path):
+    base = tmp_path.resolve()
+    archive = base / "profile"
+    archive.mkdir()
+    nested = archive / "nested"
+    nested.mkdir()
+    config = base / "profiles.json"
+    config.write_text(json.dumps({"profiles": [
+        {"id": "a", "label": "Example A", "root": str(archive)},
+        {"id": "b", "label": "Example B", "root": str(nested)},
+    ]}))
+    output = base / "not-created"
+    rejected = invoke(output, "--profiles-config", str(config))
+    assert rejected.returncode != 0 and not output.exists()
+
+    config.write_text(json.dumps({"profiles": [{"id": "a", "label": "Example A", "root": str(archive)}]}))
+    alias = base / "profiles-link.json"
+    alias.symlink_to(config)
+    rejected = invoke(output, "--profiles-config", str(alias))
+    assert rejected.returncode != 0 and not output.exists()
+
+
+def test_private_config_and_archive_cannot_overlap_checkout_or_output(tmp_path):
+    base = tmp_path.resolve()
+    # The source checkout must never become a private subject archive.
+    config = base / "profiles.json"
+    config.write_text(json.dumps({"profiles": [{"id": "p", "label": "Example", "root": str(ROOT)}]}))
+    output = base / "not-created"
+    rejected = invoke(output, "--profiles-config", str(config))
+    assert rejected.returncode != 0 and not output.exists()
+
+    # Preparing inside a profile archive would mix program assets with records.
+    archive = base / "synthetic-profile"
+    archive.mkdir()
+    config.write_text(json.dumps({"profiles": [{"id": "p", "label": "Example", "root": str(archive)}]}))
+    rejected = invoke(archive / "not-created", "--profiles-config", str(config))
+    assert rejected.returncode != 0 and not (archive / "not-created").exists()
+
+
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="optional MCP extra is not installed")
 def test_prepared_catalog_runs_public_server_without_installation(tmp_path):
     # Spaces test that the displayed shell commands remain correctly quoted.
@@ -78,6 +128,9 @@ def test_prepared_catalog_runs_public_server_without_installation(tmp_path):
     shutil.copytree(prepared_plugin, copied_plugin)
     locator = json.loads((copied_plugin / ".local-install.json").read_text(encoding="utf-8"))
     assert locator["schema"] == "health-analyzer.local-install/1"
+    assert "profiles_config" not in locator
+    assert report["local_profiles"] == "not_configured"
+    assert report["local_profile_permission_warnings"] == []
     assert Path(locator["source_root"]) == ROOT
     assert Path(locator["source_root"], "scripts/health-document").is_file()
     assert Path(locator["source_root"], "scripts/health-files").is_file()
@@ -86,3 +139,59 @@ def test_prepared_catalog_runs_public_server_without_installation(tmp_path):
     assert shlex.split(report["commands_not_executed"][1])[3] == (
         "health-analyzer-v2@" + catalog["name"])
     assert json.loads((output / "preparation-summary.json").read_text(encoding="utf-8")) == report
+
+
+@pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="optional MCP extra is not installed")
+def test_private_profile_locator_is_bound_without_copying_archive_data(tmp_path):
+    base = tmp_path.resolve()
+    archive = base / "synthetic-profile"
+    archive.mkdir(mode=0o700)
+    document = archive / "invented-document.txt"
+    document.write_text("Synthetic private sentinel", encoding="utf-8")
+    config = base / "private-profiles.json"
+    config.write_text(json.dumps({"profiles": [{"id": "p", "label": "Example profile", "root": str(archive)}]}))
+    config.chmod(0o600)
+    output = base / "prepared"
+
+    result = invoke(output, "--python", sys.executable, "--profiles-config", str(config))
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["local_profiles"] == "configuration_and_roots_validated"
+    assert report["local_profile_permission_warnings"] == ["acl_and_parent_access_not_checked"]
+    assert str(config) not in result.stdout and str(archive) not in result.stdout
+    plugin = output / "marketplace/plugins/health-analyzer-v2"
+    locator_path = plugin / ".local-install.json"
+    locator = json.loads(locator_path.read_text(encoding="utf-8"))
+    assert locator["profiles_config"] == str(config)
+    assert locator_path.stat().st_mode & 0o777 == 0o600
+    assert "Example profile" not in locator_path.read_text(encoding="utf-8")
+    assert not any(path.name == document.name for path in plugin.rglob("*"))
+    assert document.read_text(encoding="utf-8") == "Synthetic private sentinel"
+
+    # A synthetic cache copy retains only the locator, not profile contents.
+    cache_copy = base / "cache-copy"
+    shutil.copytree(plugin, cache_copy)
+    assert json.loads((cache_copy / ".local-install.json").read_text())["profiles_config"] == str(config)
+    assert not any(path.name == document.name for path in cache_copy.rglob("*"))
+
+
+@pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="optional MCP extra is not installed")
+def test_broad_profile_modes_warn_without_changing_permissions(tmp_path):
+    base = tmp_path.resolve()
+    archive = base / "synthetic-profile"
+    archive.mkdir()
+    archive.chmod(0o755)
+    config = base / "private-profiles.json"
+    config.write_text(json.dumps({"profiles": [{"id": "p", "label": "Example profile", "root": str(archive)}]}))
+    config.chmod(0o644)
+    output = base / "prepared"
+
+    result = invoke(output, "--python", sys.executable, "--profiles-config", str(config))
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert set(report["local_profile_permission_warnings"]) == {
+        "acl_and_parent_access_not_checked", "profile_config_group_or_other_mode_bits",
+        "profile_root_group_or_other_mode_bits",
+    }
+    assert config.stat().st_mode & 0o777 == 0o644
+    assert archive.stat().st_mode & 0o777 == 0o755

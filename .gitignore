@@ -57,6 +57,7 @@ build/
 id_rsa
 
 # Local-only health archives and v2 deployment settings.
+.local-install.json
 /analyses-all/
 /health-analyzer-v2.json
 /work/

@@ -105,8 +105,8 @@
     },
     {
       "path": "scripts/prepare-v2-install",
-      "sha256": "dda45d4405cc36344fe57175bc52e3b47499f416b5eaf22d882c287b2d3aa30b",
-      "size": 13208
+      "sha256": "1fe3d6707228704d28e5630ee679b4de2a40929202c193e661a9499683a1aa07",
+      "size": 17225
     },
     {
       "path": "scripts/render-sandbox-profile",
