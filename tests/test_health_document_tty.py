@@ -141,9 +141,63 @@ def test_terminal_lock_fails_closed_if_exclusivity_is_not_enforced(monkeypatch) 
     original, blocking = termios.tcgetattr(slave), os.get_blocking(slave)
     stream = os.fdopen(os.dup(slave), "rb", buffering=0)
     marks: list[str] = []
-    monkeypatch.setattr(fcntl, "flock", lambda _fd, _operation: None)
+    monkeypatch.setattr(fcntl, "lockf", lambda _fd, _operation: None)
     try:
         with pytest.raises(LocalIntakeError, match="not exclusive"):
+            storage.read_supplied_transcript_tty(stream, marks.append)
+        assert marks == []
+        _assert_restored(slave, original, blocking)
+    finally:
+        stream.close()
+        os.close(master)
+        os.close(slave)
+
+
+def test_terminal_lock_section_does_not_open_duplicate_or_close_tty(monkeypatch) -> None:
+    master, slave = pty.openpty()
+    stream = os.fdopen(os.dup(slave), "rb", buffering=0)
+    original, blocking = termios.tcgetattr(slave), os.get_blocking(slave)
+    terminal_identity = os.fstat(slave).st_rdev
+    real_close = os.close
+
+    def deny_open(*_args, **_kwargs):
+        raise AssertionError("tty section must not open paths")
+
+    def deny_dup(*_args, **_kwargs):
+        raise AssertionError("tty section must not duplicate descriptors")
+
+    def deny_close_terminal(fd: int) -> None:
+        if os.isatty(fd) and os.fstat(fd).st_rdev == terminal_identity:
+            raise AssertionError("tty section must not close a terminal descriptor")
+        real_close(fd)
+
+    def announce(mark: str) -> None:
+        if mark == "READY":
+            _send(master, b"fictional text\x04")
+        elif mark.startswith("CONFIRM:"):
+            _send(master, (mark + "\n").encode("ascii"))
+
+    try:
+        with monkeypatch.context() as guarded:
+            guarded.setattr(os, "open", deny_open)
+            guarded.setattr(os, "dup", deny_dup)
+            guarded.setattr(os, "close", deny_close_terminal)
+            assert storage.read_supplied_transcript_tty(stream, announce) == "fictional text"
+        _assert_restored(slave, original, blocking)
+    finally:
+        stream.close()
+        real_close(master)
+        real_close(slave)
+
+
+def test_terminal_lock_refuses_multi_threaded_process_before_ready(monkeypatch) -> None:
+    master, slave = pty.openpty()
+    stream = os.fdopen(os.dup(slave), "rb", buffering=0)
+    original, blocking = termios.tcgetattr(slave), os.get_blocking(slave)
+    marks: list[str] = []
+    monkeypatch.setattr(storage.threading, "active_count", lambda: 2)
+    try:
+        with pytest.raises(LocalIntakeError, match="unavailable"):
             storage.read_supplied_transcript_tty(stream, marks.append)
         assert marks == []
         _assert_restored(slave, original, blocking)

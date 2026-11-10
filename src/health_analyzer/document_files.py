@@ -376,65 +376,73 @@ def read_supplied_transcript_stream(stream: BinaryIO) -> str:
 
 @contextmanager
 def _tty_process_lock(fd: int):
-    """Lock the actual terminal through a separately opened file description.
+    """Take a cooperative per-process terminal record lock on the caller's fd.
 
-    Locking an inherited or duplicated descriptor is insufficient because its
-    open-file description can be shared by different processes. Test the
-    conflict semantics with a second independently opened descriptor before
-    allowing any terminal state changes.
+    Record locks conflict between processes even with one inherited open-file
+    description. Closing any fd for this terminal in this process releases
+    them, so this guarded, single-threaded section must never open, duplicate or
+    close a terminal fd. Only pipe descriptors created below are closed here.
+    On some systems these locks do not interoperate with old flock-based
+    readers; never share a terminal with old or non-cooperating processes.
     """
     try:
         import fcntl
     except ImportError as exc:
         raise LocalIntakeError("Terminal process locking is unavailable.") from exc
-    required = ("O_NOFOLLOW", "O_NOCTTY", "O_NONBLOCK", "O_CLOEXEC")
-    if not all(hasattr(os, flag) for flag in required):
+    if not hasattr(os, "fork") or threading.active_count() != 1:
         raise LocalIntakeError("Safe terminal process locking is unavailable.")
-    flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NOCTTY | os.O_NONBLOCK | os.O_CLOEXEC
-    lock_fd = None
-    probe_fd = None
+    acquired = False
     try:
         initial = os.fstat(fd)
         if not stat.S_ISCHR(initial.st_mode) or not os.isatty(fd):
             raise LocalIntakeError("A terminal input is required.")
-        path = os.ttyname(fd)
-
-        def same_device(other: int) -> bool:
-            current = os.fstat(other)
-            return (stat.S_ISCHR(current.st_mode)
-                    and (current.st_dev, current.st_ino, current.st_rdev)
-                    == (initial.st_dev, initial.st_ino, initial.st_rdev)
-                    and os.isatty(other))
-
-        lock_fd = os.open(path, flags)
-        if not same_device(lock_fd):
-            raise LocalIntakeError("Terminal identity changed before locking.")
         try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise LocalIntakeError("Another terminal input is active.") from exc
-
-        probe_fd = os.open(path, flags)
-        if not same_device(probe_fd) or not same_device(fd):
-            raise LocalIntakeError("Terminal identity changed during locking.")
+        acquired = True
+        read_fd, write_fd = os.pipe()
+        child: int | None = None
         try:
-            fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            pass
-        else:
-            raise LocalIntakeError("Terminal process locks are not exclusive.")
-        os.close(probe_fd)
-        probe_fd = None
+            child = os.fork()
+            if child == 0:
+                try:
+                    os.close(read_fd)
+                    try:
+                        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        result = b"C"
+                    except OSError:
+                        result = b"E"
+                    else:
+                        result = b"U"
+                    os.write(write_fd, result)
+                finally:
+                    os._exit(0)
+            os.close(write_fd)
+            write_fd = -1
+            readable, _, _ = select.select([read_fd], [], [], 3.0)
+            if not readable or os.read(read_fd, 1) != b"C":
+                raise LocalIntakeError("Terminal process locks are not exclusive.")
+        finally:
+            if write_fd != -1:
+                os.close(write_fd)
+            os.close(read_fd)
+            if child is not None and child > 0:
+                # A stopped/broken probe must not leave a child or block cleanup.
+                try:
+                    os.kill(child, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                os.waitpid(child, 0)
         yield
     except LocalIntakeError:
         raise
     except (AttributeError, OSError, ValueError) as exc:
         raise LocalIntakeError("Safe terminal process locking failed.") from exc
     finally:
-        if probe_fd is not None:
-            os.close(probe_fd)
-        if lock_fd is not None:
-            os.close(lock_fd)
+        if acquired:
+            fcntl.lockf(fd, fcntl.LOCK_UN)
 
 
 def read_supplied_transcript_tty(stream: BinaryIO, announce: Callable[[str], None]) -> str:
