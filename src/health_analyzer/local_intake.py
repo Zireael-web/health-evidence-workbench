@@ -20,6 +20,7 @@ from typing import Iterator, Literal
 
 
 MAX_PDF_BYTES = 64 * 1024 * 1024
+MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024
 _CHUNK_BYTES = 1024 * 1024
 
 
@@ -316,3 +317,141 @@ def copy_authorized_pdf(
         raise LocalIntakeError(
             "Local PDF intake failed: paths must exist, contain no symlinks, and allow secure copying."
         ) from exc
+
+
+def _read_transcript_bytes(
+    parent_fd: int, name: str, expected_identity: tuple[int, int] | None = None,
+) -> bytes:
+    with _regular_file(parent_fd, name) as fd:
+        before = os.fstat(fd)
+        if expected_identity is not None and _identity(before) != expected_identity:
+            raise LocalIntakeError("Transcript path was replaced during access.")
+        if before.st_size > MAX_TRANSCRIPT_BYTES:
+            raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
+        content = bytearray()
+        while chunk := os.read(fd, min(_CHUNK_BYTES, MAX_TRANSCRIPT_BYTES + 1 - len(content))):
+            content.extend(chunk)
+            if len(content) > MAX_TRANSCRIPT_BYTES:
+                raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
+        named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        if (len(content) != before.st_size
+                or _snapshot(os.fstat(fd)) != _snapshot(before)
+                or _snapshot(named) != _snapshot(before)):
+            raise LocalIntakeError("Transcript changed during access.")
+        return bytes(content)
+
+
+def _existing_transcript(
+    parent_fd: int, name: str, content: bytes,
+    expected_identity: tuple[int, int] | None = None,
+) -> bool:
+    try:
+        try:
+            saved = _read_transcript_bytes(parent_fd, name, expected_identity)
+        except LocalIntakeError as exc:
+            raise IntakeConflictError("Existing transcript is not an identical bounded text file.") from exc
+        if saved != content:
+            raise IntakeConflictError("Existing transcript has different contents.")
+        return True
+    except FileNotFoundError:
+        if expected_identity is not None:
+            raise LocalIntakeError("Published transcript disappeared during intake.") from None
+        return False
+
+
+def save_model_transcript(pdf: Path, text: str, *, expected_sha256: str) -> IntakeResult:
+    """Save dialogue-supplied text beside its hash-checked PDF, without recognition.
+
+    The same-stem ``.txt`` contains the exact supplied UTF-8 bytes, up to 8 MiB.
+    Existing identical text is reused unchanged; different text is never replaced.
+    This does not establish transcription accuracy or source-page coverage.
+    """
+    if not isinstance(text, str):
+        raise LocalIntakeError("Model transcript must be a UTF-8 string.")
+    try:
+        content = text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise LocalIntakeError("Model transcript must be valid UTF-8.") from exc
+    if len(content) > MAX_TRANSCRIPT_BYTES:
+        raise LocalIntakeError("Transcript exceeds the 8 MiB UTF-8 limit.")
+    if (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
+            or any(char not in "0123456789abcdefABCDEF" for char in expected_sha256)):
+        raise LocalIntakeError("Expected SHA-256 must contain exactly 64 hexadecimal characters.")
+    expected_sha256 = expected_sha256.lower()
+    pdf = _absolute_path(pdf)
+    if pdf.suffix.casefold() != ".pdf":
+        raise LocalIntakeError("Select the preserved PDF with a .pdf filename.")
+    destination = pdf.with_suffix(".txt")
+    text_hash = hashlib.sha256(content).hexdigest()
+    try:
+        with _directory(pdf.parent) as parent_fd, _regular_file(parent_fd, pdf.name) as source_fd:
+            original = os.fstat(source_fd)
+            if _hash_pdf(source_fd) != expected_sha256:
+                raise LocalIntakeError("PDF does not match the previously inspected SHA-256.")
+            _assert_source(pdf, source_fd, original, expected_sha256)
+            if _existing_transcript(parent_fd, destination.name, content):
+                _assert_destination_parent(pdf.parent, parent_fd, (), parent_fd)
+                _assert_source(pdf, source_fd, original, expected_sha256)
+                if not _existing_transcript(parent_fd, destination.name, content):
+                    raise LocalIntakeError("Existing transcript disappeared during intake.")
+                return IntakeResult(destination, text_hash, "already_present")
+
+            temporary_name = f".model-transcript-{secrets.token_hex(16)}.tmp"
+            temporary_fd = os.open(
+                temporary_name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0o600, dir_fd=parent_fd,
+            )
+            temporary_identity = _identity(os.fstat(temporary_fd))
+            try:
+                os.fchmod(temporary_fd, 0o600)
+                pending = memoryview(content)
+                while pending:
+                    written = os.write(temporary_fd, pending)
+                    if written == 0:
+                        raise LocalIntakeError("Could not write the complete model transcript.")
+                    pending = pending[written:]
+                os.fsync(temporary_fd)
+                if _read_transcript_bytes(parent_fd, temporary_name, temporary_identity) != content:
+                    raise LocalIntakeError("Temporary transcript differs from the supplied text.")
+                _assert_source(pdf, source_fd, original, expected_sha256)
+                _assert_destination_parent(pdf.parent, parent_fd, (), parent_fd)
+                try:
+                    os.link(temporary_name, destination.name, src_dir_fd=parent_fd,
+                            dst_dir_fd=parent_fd, follow_symlinks=False)
+                except FileExistsError:
+                    status: Literal["copied", "already_present"] = "already_present"
+                else:
+                    status = "copied"
+                _assert_source(pdf, source_fd, original, expected_sha256)
+                _assert_destination_parent(pdf.parent, parent_fd, (), parent_fd)
+                if not _existing_transcript(parent_fd, destination.name, content,
+                                            temporary_identity if status == "copied" else None):
+                    raise LocalIntakeError("Transcript disappeared before intake completed.")
+                os.fsync(parent_fd)
+                return IntakeResult(destination, text_hash, status)
+            finally:
+                os.close(temporary_fd)
+                try:
+                    current = os.stat(temporary_name, dir_fd=parent_fd, follow_symlinks=False)
+                    if _identity(current) == temporary_identity:
+                        os.unlink(temporary_name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+    except OSError as exc:
+        raise LocalIntakeError("Transcript paths must exist, contain no symlinks, and allow secure access.") from exc
+
+
+def read_model_transcript(path: Path) -> str:
+    """Read the complete bounded UTF-8 staging TXT without following symlinks."""
+    path = _absolute_path(path)
+    if path.suffix.casefold() != ".txt":
+        raise LocalIntakeError("Model transcript input must be a .txt file.")
+    try:
+        with _directory(path.parent) as parent_fd:
+            content = _read_transcript_bytes(parent_fd, path.name)
+            _assert_destination_parent(path.parent, parent_fd, (), parent_fd)
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise LocalIntakeError("Model transcript input must be valid UTF-8.") from exc
+    except OSError as exc:
+        raise LocalIntakeError("Transcript paths must exist, contain no symlinks, and allow secure access.") from exc

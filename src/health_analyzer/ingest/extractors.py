@@ -262,7 +262,7 @@ class PDFProviderExtractor:
 
 
 class OCRProviderExtractor:
-    """Adapter for optional OCR providers; output remains untrusted OCR data."""
+    """Historical adapter identity; local OCR provider execution is disabled."""
 
     def __init__(
         self,
@@ -287,29 +287,18 @@ class OCRProviderExtractor:
         )
 
     def extract(self, artifact: DocumentArtifact) -> tuple[BlockDraft, ...]:
-        try:
-            blocks = tuple(self.provider.recognize(artifact.content, artifact.media_type))
-        except ExtractorFailure:
-            raise
-        except Exception as error:
-            raise ExtractorFailure(
-                "ocr_provider_failure",
-                f"OCR provider failed with {type(error).__name__}.",
-            ) from None
-        if not blocks:
-            raise ExtractorFailure("empty_ocr_extraction", "OCR provider returned no blocks.")
-        for block in blocks:
-            if block.kind not in (BlockKind.OCR, BlockKind.TABLE, BlockKind.IMAGE):
-                raise ExtractorFailure(
-                    "invalid_ocr_block",
-                    "OCR provider must label text as OCR, not native text.",
-                    recoverable=False,
-                )
-        return blocks
+        # Keep this adapter importable for historical configuration/payload
+        # compatibility, but never call a supplied provider or retry a fallback.
+        raise ExtractorFailure(
+            "LOCAL_OCR_DISABLED",
+            "Local OCR is disabled; use ChatGPT/Codex visual transcription.",
+            recoverable=False,
+        )
+
 
 
 class ImagePassthroughExtractor:
-    """Records image payload identity when no OCR is requested or available."""
+    """Records image payload identity pending visual transcription."""
 
     descriptor = ExtractorDescriptor(
         extractor_id="stdlib-image-passthrough",
@@ -327,8 +316,8 @@ class ImagePassthroughExtractor:
                 page=1,
                 document_incomplete=True,
                 limitations=(
-                    "Image bytes were indexed only; no OCR provider was used and "
-                    "the document requires OCR before textual ingestion is complete.",
+                    "Image bytes were indexed only; local OCR is disabled and "
+                    "ChatGPT/Codex visual transcription is required.",
                 ),
             ),
         )

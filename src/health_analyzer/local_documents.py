@@ -64,6 +64,25 @@ class LocalDocumentError(RuntimeError):
         self.code = code
 
 
+def _render_executable() -> str | None:
+    executable = shutil.which("pdftoppm")
+    if executable is not None or sys.platform != "darwin":
+        return executable
+    # The existing Codex dependency need not be exposed in the shell PATH.
+    candidate = (Path.home() / ".cache/codex-runtimes/codex-primary-runtime"
+                 / "dependencies/native/poppler/poppler/bin/pdftoppm")
+    try:
+        for item in (candidate, *candidate.parents):
+            info = item.lstat()
+            if item.is_symlink() or info.st_uid not in {0, os.geteuid()} or info.st_mode & 0o022:
+                return None
+        if not candidate.is_file() or not os.access(candidate, os.X_OK):
+            return None
+    except OSError:
+        return None
+    return str(candidate)
+
+
 def render_local_pdf(
     path: str | Path,
     output_dir: str | Path,
@@ -97,7 +116,7 @@ def render_local_pdf(
             page_count = _pdf_page_count(content, isolation="host")
             if page_count > MAX_RENDER_PAGES:
                 raise LocalDocumentError("pdf_render_page_limit_exceeded", "PDF has too many pages for bounded rendering.")
-            executable = shutil.which("pdftoppm")
+            executable = _render_executable()
             if executable is None:
                 raise LocalDocumentError("poppler_dependency_missing", "Local pdftoppm is required for PDF rendering.")
             parent = _absolute_source_path(output_dir)
@@ -555,7 +574,8 @@ def _pdf_page_count(content: bytes, *, isolation: str = "nested") -> int:
 
 
 def _host_worker_command(flag: str) -> tuple[str, ...]:
-    return (sys.executable, "-I", "-B", "-X", "utf8", "-m", "health_analyzer.local_documents", flag)
+    return (sys.executable, "-I", "-B", "-X", "utf8",
+            str(Path(__file__).resolve().with_name("local_document_entry.py")), flag)
 
 
 def _extract_host_text(content: bytes, provider: PypdfTextProvider) -> tuple[BlockDraft, ...]:

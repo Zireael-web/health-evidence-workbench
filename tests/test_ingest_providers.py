@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from health_analyzer.ingest import (
     BlockDraft,
     BlockKind,
@@ -15,8 +13,6 @@ from health_analyzer.ingest import (
 )
 from health_analyzer.contracts import VerificationStatus
 
-
-FIXTURES = Path(__file__).parents[1] / "fixtures" / "ingest"
 
 
 class SyntheticPDFProvider:
@@ -62,7 +58,7 @@ class SyntheticOCRProvider:
 def test_optional_pdf_provider_preserves_page_bbox_and_provider_identity() -> None:
     adapter = PDFProviderExtractor(SyntheticPDFProvider())
     pipeline = IngestionPipeline(registry=ExtractorRegistry((adapter,)))
-    artifact = DocumentArtifact.from_path(FIXTURES / "provider-placeholder.pdf")
+    artifact = DocumentArtifact.from_bytes(b"%PDF-1.4 synthetic provider placeholder", media_type="application/pdf")
 
     result = pipeline.ingest(
         artifact,
@@ -79,36 +75,18 @@ def test_optional_pdf_provider_preserves_page_bbox_and_provider_identity() -> No
     assert "review-routing signal" in " ".join(result.candidates[0].limitations)
 
 
-def test_optional_ocr_provider_wins_by_priority_and_marks_ocr_origin() -> None:
-    adapter = OCRProviderExtractor(SyntheticOCRProvider())
-    registry = ExtractorRegistry((ImagePassthroughExtractor(), adapter))
-    pipeline = IngestionPipeline(registry=registry)
-    artifact = DocumentArtifact.from_bytes(
-        b"synthetic-image",
-        media_type="image/png",
-        source_name="synthetic.png",
-    )
+def test_registered_ocr_provider_is_disabled_before_recognition() -> None:
+    class NeverCalled(SyntheticOCRProvider):
+        def recognize(self, content, media_type):
+            raise AssertionError("Local OCR provider must never be called")
 
-    result = pipeline.ingest(
-        artifact,
-        required_capabilities=frozenset(
-            {ExtractionCapability.IMAGE, ExtractionCapability.OCR}
-        ),
-    )
-
-    block = result.blocks[0]
-    assert block.kind is BlockKind.OCR
-    assert block.extractor_id == "ocr-provider:synthetic-ocr"
-    assert block.confidence == 0.83
-    assert result.candidates[0].confidence == 0.83
-    assert result.candidates[0].verification is VerificationStatus.NEEDS_REVIEW
-    assert "requires human verification" in " ".join(
-        result.candidates[0].limitations
-    )
-    assert "review-routing signal" in " ".join(
-        result.candidates[0].limitations
-    )
-    assert "requires human verification" in " ".join(result.limitations)
+    registry = ExtractorRegistry((ImagePassthroughExtractor(), OCRProviderExtractor(NeverCalled())))
+    artifact = DocumentArtifact.from_bytes(b"synthetic-image", media_type="image/png")
+    result = IngestionPipeline(registry=registry).ingest(
+        artifact, required_capabilities=frozenset({ExtractionCapability.IMAGE, ExtractionCapability.OCR}))
+    assert not result.blocks and not result.candidates
+    assert [failure.code for failure in result.failures] == ["LOCAL_OCR_DISABLED"]
+    assert result.failures[0].recoverable is False
 
 
 def test_image_passthrough_indexes_bytes_without_inventing_text() -> None:
@@ -125,53 +103,24 @@ def test_image_passthrough_indexes_bytes_without_inventing_text() -> None:
     assert repeated.deduplicated is False
     assert pipeline.cache_entry_count == 0
     assert not result.candidates
-    assert "no OCR provider" in " ".join(result.limitations)
+    assert "local OCR is disabled" in " ".join(result.limitations)
 
 
-def test_ocr_provider_image_only_output_cannot_claim_complete_ingestion() -> None:
-    class ImageOnlyOCRProvider:
-        provider_id = "image-only-ocr"
-        version = "1"
 
-        def recognize(self, content: bytes, media_type: str) -> tuple[BlockDraft, ...]:
-            return (
-                BlockDraft(
-                    kind=BlockKind.IMAGE,
-                    payload_sha256="a" * 64,
-                ),
-            )
+def test_disabled_ocr_provider_never_falls_back_or_populates_cache() -> None:
+    class NeverCalled(SyntheticOCRProvider):
+        def recognize(self, content, media_type):
+            raise AssertionError("Local OCR provider must never be called")
 
-    pipeline = IngestionPipeline(
-        registry=ExtractorRegistry((OCRProviderExtractor(ImageOnlyOCRProvider()),))
-    )
-    artifact = DocumentArtifact.from_bytes(b"image", media_type="image/png")
-
+    pipeline = IngestionPipeline(registry=ExtractorRegistry(
+        (OCRProviderExtractor(NeverCalled()), ImagePassthroughExtractor())))
+    artifact = DocumentArtifact.from_bytes(b"synthetic-image", media_type="image/png")
     result = pipeline.ingest(artifact)
     repeated = pipeline.ingest(artifact)
-
-    assert result.blocks[0].kind is BlockKind.IMAGE
-    assert result.blocks[0].document_incomplete is True
-    assert result.complete is repeated.complete is False
+    assert result.blocks == repeated.blocks == ()
     assert result.candidates == repeated.candidates == ()
+    assert [failure.code for failure in result.failures] == ["LOCAL_OCR_DISABLED"]
+    assert result.failures[0].recoverable is False
+    assert result.complete is repeated.complete is False
     assert repeated.deduplicated is False
     assert pipeline.cache_entry_count == 0
-
-
-def test_ocr_provider_cannot_mislabel_recognized_text_as_native_text() -> None:
-    class InvalidOCRProvider:
-        provider_id = "invalid-ocr"
-        version = "1"
-
-        def recognize(self, content: bytes, media_type: str) -> tuple[BlockDraft, ...]:
-            return (BlockDraft(kind=BlockKind.TEXT, text="not-native"),)
-
-    registry = ExtractorRegistry(
-        (OCRProviderExtractor(InvalidOCRProvider()), ImagePassthroughExtractor())
-    )
-    artifact = DocumentArtifact.from_bytes(b"synthetic-image", media_type="image/png")
-
-    result = IngestionPipeline(registry=registry).ingest(artifact)
-
-    assert not result.blocks
-    assert [failure.code for failure in result.failures] == ["invalid_ocr_block"]
-    assert result.failures[0].recoverable is False

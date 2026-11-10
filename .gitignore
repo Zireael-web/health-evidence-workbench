@@ -55,3 +55,8 @@ build/
 *.p12
 *.pfx
 id_rsa
+
+# Local-only health archives and v2 deployment settings.
+/analyses-all/
+/health-analyzer-v2.json
+/work/
